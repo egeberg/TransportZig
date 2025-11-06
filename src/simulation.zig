@@ -3,6 +3,8 @@ const types = @import("types.zig");
 const entities = @import("entities.zig");
 const economics = @import("economics.zig");
 const flight = @import("flight.zig");
+const weather = @import("weather.zig");
+const notam = @import("notam.zig");
 
 // ============================================================================
 // SIMULATION ENGINE
@@ -30,6 +32,14 @@ pub const SimulationWorld = struct {
     fuel_pricing: economics.FuelPricing,
     market_condition: types.MarketCondition,
 
+    // Weather service
+    weather_service: weather.WeatherService,
+    last_weather_update: types.SimTime,
+
+    // NOTAM service
+    notam_service: notam.NotamService,
+    last_notam_update: types.SimTime,
+
     // Counters for ID generation
     next_airport_id: u32,
     next_aircraft_id: u32,
@@ -55,6 +65,10 @@ pub const SimulationWorld = struct {
             .flight_scheduler = flight.FlightScheduler.init(allocator),
             .fuel_pricing = economics.FuelPricing.init(),
             .market_condition = .normal,
+            .weather_service = weather.WeatherService.init(allocator, weather.WeatherConfig.initDefault()),
+            .last_weather_update = types.SimTime{ .seconds = 0 },
+            .notam_service = notam.NotamService.init(allocator, notam.NotamConfig.initDefault()),
+            .last_notam_update = types.SimTime{ .seconds = 0 },
             .next_airport_id = 1,
             .next_aircraft_id = 1,
             .next_cargo_id = 1,
@@ -63,6 +77,15 @@ pub const SimulationWorld = struct {
             .next_flight_id = 1,
             .stats = SimulationStats.init(),
         };
+    }
+
+    pub fn initWithWeatherAPI(allocator: std.mem.Allocator, api_key: []const u8) SimulationWorld {
+        var world = init(allocator);
+        world.weather_service = weather.WeatherService.init(
+            allocator,
+            weather.WeatherConfig.initOpenWeatherMap(api_key),
+        );
+        return world;
     }
 
     pub fn deinit(self: *SimulationWorld) void {
@@ -75,6 +98,8 @@ pub const SimulationWorld = struct {
         self.companies.deinit();
         self.crew_members.deinit();
         self.flight_scheduler.deinit();
+        self.weather_service.deinit();
+        self.notam_service.deinit();
     }
 
     /// Main update loop - advances simulation
@@ -107,8 +132,20 @@ pub const SimulationWorld = struct {
         // Update cargo status
         self.updateCargoStatus();
 
-        // Update airport sensors (simulate environmental changes)
-        self.updateAirportSensors();
+        // Update airport sensors with real-world weather data
+        // Refresh weather every 30 minutes (configurable)
+        const time_since_last_weather_update = self.current_time.seconds - self.last_weather_update.seconds;
+        if (time_since_last_weather_update >= self.weather_service.config.update_interval_seconds) {
+            try self.updateAirportWeather();
+            self.last_weather_update = self.current_time;
+        }
+
+        // Update NOTAMs every hour (configurable)
+        const time_since_last_notam_update = self.current_time.seconds - self.last_notam_update.seconds;
+        if (time_since_last_notam_update >= self.notam_service.config.update_interval_seconds) {
+            try self.updateAirportNotams();
+            self.last_notam_update = self.current_time;
+        }
 
         // Update market conditions periodically
         if (self.current_time.seconds % 86400 == 0) { // Daily update
@@ -153,36 +190,35 @@ pub const SimulationWorld = struct {
         }
     }
 
-    fn updateAirportSensors(self: *SimulationWorld) void {
-        // Simple weather simulation
-        const time_factor = @as(f32, @floatFromInt(self.current_time.seconds % 86400)) / 86400.0;
-        const weather_random = @sin(time_factor * 6.28) * 0.5 + 0.5;
+    fn updateAirportWeather(self: *SimulationWorld) !void {
+        // Fetch real-world weather data for all airports
+        std.debug.print("\n[Weather Update] Fetching weather data for {d} airports...\n", .{self.airports.items.len});
 
         for (self.airports.items) |*airport| {
+            const weather_data = try self.weather_service.fetchWeatherForAirport(
+                airport.id,
+                airport.location.latitude,
+                airport.location.longitude,
+            );
+
+            // Apply weather data to airport sensors
+            weather_data.applyToAirportSensors(airport);
             airport.sensors.last_update = self.current_time;
 
-            // Simulate temperature variation
-            airport.sensors.temperature = 15.0 + @sin(time_factor * 6.28) * 10.0;
-
-            // Simulate wind
-            airport.sensors.wind_speed = 5.0 + weather_random * 20.0;
-            airport.sensors.wind_direction = weather_random * 360.0;
-
-            // Update weather condition
-            if (weather_random < 0.2) {
-                airport.weather = .clear;
-                airport.sensors.runway_condition = .dry;
-            } else if (weather_random < 0.6) {
-                airport.weather = .light_clouds;
-                airport.sensors.runway_condition = .dry;
-            } else if (weather_random < 0.8) {
-                airport.weather = .rain;
-                airport.sensors.runway_condition = .wet;
-            } else {
-                airport.weather = .storm;
-                airport.sensors.runway_condition = .wet;
+            // Check for weather alerts
+            if (weather.WeatherAlert.checkWeatherAlerts(weather_data, airport.id)) |alert| {
+                std.debug.print("[WEATHER ALERT] {s} ({s}): {s}\n", .{
+                    std.mem.sliceTo(&airport.iata_code, 0),
+                    @tagName(alert.severity),
+                    alert.message,
+                });
             }
         }
+    }
+
+    fn updateAirportNotams(self: *SimulationWorld) !void {
+        // Fetch NOTAMs for all airports
+        try self.notam_service.updateAllAirports(self.airports.items);
     }
 
     fn updateMarketConditions(self: *SimulationWorld) void {

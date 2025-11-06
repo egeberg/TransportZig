@@ -7,6 +7,8 @@ const flight = @import("flight.zig");
 const iot = @import("iot.zig");
 const renderer = @import("renderer.zig");
 const analytics = @import("analytics.zig");
+const weather = @import("weather.zig");
+const notam = @import("notam.zig");
 
 // ============================================================================
 // AVIATION TRANSPORT SIMULATION - MAIN APPLICATION
@@ -20,8 +22,19 @@ pub fn main() !void {
     std.debug.print("=== Aviation Transport Simulation ===\n", .{});
     std.debug.print("Initializing business application...\n\n", .{});
 
+    // Check for Weather API key from environment
+    const weather_api_key = std.process.getEnvVarOwned(allocator, "OPENWEATHER_API_KEY") catch null;
+    defer if (weather_api_key) |key| allocator.free(key);
+
     // Initialize simulation world
-    var world = simulation.SimulationWorld.init(allocator);
+    var world = if (weather_api_key) |key| blk: {
+        std.debug.print("✓ Weather API key found - using real-world weather data\n", .{});
+        break :blk simulation.SimulationWorld.initWithWeatherAPI(allocator, key);
+    } else blk: {
+        std.debug.print("⚠ No Weather API key - using simulated weather data\n", .{});
+        std.debug.print("  Set OPENWEATHER_API_KEY environment variable for real data\n", .{});
+        break :blk simulation.SimulationWorld.init(allocator);
+    };
     defer world.deinit();
 
     // Initialize IoT data aggregator
@@ -270,6 +283,43 @@ fn printAnalytics(world: *simulation.SimulationWorld, iot_agg: *iot.IoTDataAggre
         iot_analytics.sensors_operational,
         iot_analytics.total_sensors,
     });
+    std.debug.print("\n", .{});
+
+    // Weather summary
+    std.debug.print("WEATHER STATUS:\n", .{});
+    for (world.airports.items) |airport| {
+        std.debug.print("  {s}: {d:.1}°C, Wind {d:.0} km/h, Vis {d:.1} km - {s}\n", .{
+            std.mem.sliceTo(&airport.iata_code, 0),
+            airport.sensors.temperature,
+            airport.sensors.wind_speed,
+            airport.sensors.visibility,
+            @tagName(airport.weather),
+        });
+    }
+    std.debug.print("\n", .{});
+
+    // NOTAM summary
+    std.debug.print("NOTAM STATUS:\n", .{});
+    var total_notams: u32 = 0;
+    var critical_notams: u32 = 0;
+    for (world.airports.items) |airport| {
+        if (world.notam_service.cache.get(airport.id)) |airport_notams| {
+            total_notams += airport_notams.active_count;
+            critical_notams += airport_notams.critical_count;
+
+            if (airport_notams.active_count > 0) {
+                std.debug.print("  {s}: {d} active NOTAMs", .{
+                    std.mem.sliceTo(&airport.iata_code, 0),
+                    airport_notams.active_count,
+                });
+                if (airport_notams.critical_count > 0) {
+                    std.debug.print(" ({d} CRITICAL)", .{airport_notams.critical_count});
+                }
+                std.debug.print("\n", .{});
+            }
+        }
+    }
+    std.debug.print("  Total: {d} active NOTAMs ({d} critical)\n", .{ total_notams, critical_notams });
     std.debug.print("\n", .{});
 }
 

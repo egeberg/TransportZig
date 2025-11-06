@@ -1,6 +1,6 @@
 # Aviation Transport Simulation - Business Application
 
-A professional aviation cargo transport simulation with 3D visualization, IoT integration, and comprehensive business analytics.
+A professional aviation cargo transport simulation with 3D visualization, IoT integration, real-world weather data, NOTAM integration, and comprehensive business analytics.
 
 ## Features
 
@@ -10,6 +10,23 @@ A professional aviation cargo transport simulation with 3D visualization, IoT in
 - **Route Planning**: Automated waypoint generation, flight time estimation
 - **Cargo Management**: Multiple cargo types with handling requirements
 - **Financial Tracking**: Revenue, costs, P&L, profit margins
+
+### Real-World Data Integration
+- **Weather Data**: Live weather from OpenWeatherMap API or simulated data
+  - Temperature, wind speed/direction, visibility, pressure
+  - Precipitation (rain/snow) detection
+  - Weather alerts for critical conditions (low visibility, high winds, thunderstorms)
+  - Automatic impact on flight operations and fuel consumption
+  - 30-minute update intervals (configurable)
+- **NOTAM Integration**: Notice to Airmen from FAA/ICAO sources
+  - ICAO format parser and decoder
+  - Runway/taxiway/aerodrome closures
+  - Navigation aid status (VOR, ILS, NDB)
+  - Airspace restrictions and temporary flight restrictions (TFR)
+  - Obstacle and construction warnings
+  - Fuel availability notices
+  - Automatic operational impact assessment
+  - Hourly updates (configurable)
 
 ### IoT Integration
 - **Aircraft Telemetry**: Real-time position, altitude, speed, heading tracking
@@ -44,6 +61,8 @@ src/
 ├── flight.zig         - Flight planning and management
 ├── simulation.zig     - Simulation engine and world state
 ├── iot.zig           - IoT telemetry and sensor networks
+├── weather.zig       - Real-world weather data integration
+├── notam.zig         - NOTAM fetching, parsing, and decoding
 ├── renderer.zig      - 3D visualization with raylib
 └── analytics.zig     - Business intelligence and KPIs
 ```
@@ -73,6 +92,38 @@ zig build run
 # Run tests
 zig build test
 ```
+
+## Configuration
+
+### Weather API Integration
+
+The application can use real-world weather data from OpenWeatherMap:
+
+1. **Get an API key**: Sign up at [OpenWeatherMap](https://openweathermap.org/api) (free tier available)
+2. **Set environment variable**:
+   ```bash
+   export OPENWEATHER_API_KEY="your_api_key_here"
+   ```
+3. **Run the application**:
+   ```bash
+   zig build run
+   ```
+
+If no API key is provided, the application will use simulated weather data.
+
+### NOTAM Integration
+
+NOTAMs are fetched from open sources:
+- **FAA NOTAM Search**: https://notams.aim.faa.gov/notamSearch/
+- **ICAO**: International NOTAMs via standard APIs
+
+The application includes:
+- Automatic ICAO format parsing
+- NOTAM categorization (runway closures, navaid status, etc.)
+- Severity classification (low, medium, high, critical)
+- Operational impact assessment
+
+NOTAMs update hourly (configurable in `NotamConfig`).
 
 ## Aircraft Types
 
@@ -186,10 +237,14 @@ This is a business simulation application for educational and demonstration purp
 ✅ Core simulation engine
 ✅ Aviation economics model
 ✅ IoT integration layer
+✅ Real-world weather data integration (OpenWeatherMap API)
+✅ NOTAM fetching, parsing and decoding (FAA/ICAO)
 ✅ 3D visualization
 ✅ Business analytics
 ✅ Flight management system
 ✅ Cargo handling
 ✅ Multi-airport network
+✅ Weather alerts and operational impact
+✅ NOTAM operational impact assessment
 
-Ready for testing and deployment!
+Ready for testing and deployment as an IoT-enabled business solution!
