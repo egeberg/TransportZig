@@ -262,17 +262,20 @@ pub const WeatherService = struct {
         var response_buffer = std.ArrayList(u8){};
         defer response_buffer.deinit(self.allocator);
 
-        // Make HTTP request using fetch API
+        // Make HTTP request using fetch API (Zig 0.15.1)
         const fetch_result = try self.http_client.fetch(.{
             .location = .{ .uri = uri },
             .method = .GET,
-            .response_storage = .{ .dynamic = &response_buffer },
+            .max_append_size = 16 * 1024 * 1024, // 16MB max response
         });
 
         // Check status
         if (fetch_result.status != .ok) {
             return error.WeatherAPIBadStatus;
         }
+
+        // Read response body
+        try response_buffer.appendSlice(self.allocator, fetch_result.body);
 
         // Parse JSON response
         return try WeatherData.fromOpenWeatherMapJSON(self.allocator, response_buffer.items);

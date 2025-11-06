@@ -520,15 +520,11 @@ pub const NotamService = struct {
             return std.ArrayList(Notam){};
         };
 
-        // Allocate buffer for response
-        var response_buffer = std.ArrayList(u8){};
-        defer response_buffer.deinit(self.allocator);
-
-        // Make HTTP request using fetch API
+        // Make HTTP request using fetch API (Zig 0.15.1)
         const fetch_result = self.http_client.fetch(.{
             .location = .{ .uri = uri },
             .method = .GET,
-            .response_storage = .{ .dynamic = &response_buffer },
+            .max_append_size = 16 * 1024 * 1024, // 16MB max response
         }) catch |err| {
             std.debug.print("NOTAM API request failed: {}\n", .{err});
             return std.ArrayList(Notam){};
@@ -545,7 +541,7 @@ pub const NotamService = struct {
         var notams = std.ArrayList(Notam){};
         var parser = NotamParser.init(self.allocator);
 
-        var line_iter = std.mem.splitScalar(u8, response_buffer.items, '\n');
+        var line_iter = std.mem.splitScalar(u8, fetch_result.body, '\n');
         while (line_iter.next()) |line| {
             if (line.len == 0) continue;
 
