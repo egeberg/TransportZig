@@ -487,21 +487,12 @@ pub const NotamService = struct {
             .{ self.config.faa_endpoint, icao_str }
         );
 
-        // Make HTTP request (simplified - production would handle auth, parsing, etc.)
-        var req = self.http_client.open(.GET, try std.Uri.parse(url), .{}) catch {
-            // If API fails, return empty list
-            return notams;
-        };
-        defer req.deinit();
+        // TODO: HTTP Client API changed in Zig 0.15.1
+        // The .open() method no longer exists. Need to update to new API.
+        // For now, fall back to simulated NOTAMs.
+        _ = url;
 
-        req.send() catch return notams;
-        req.finish() catch return notams;
-        req.wait() catch return notams;
-
-        // Read and parse response
-        // In production, this would parse JSON/XML response from FAA
-        // For now, return empty list on API call
-
+        // Return empty list (simulated NOTAMs will be used instead)
         return notams;
     }
 

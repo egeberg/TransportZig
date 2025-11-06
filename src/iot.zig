@@ -40,7 +40,7 @@ pub const AircraftTelemetryStream = struct {
     }
 
     pub fn deinit(self: *AircraftTelemetryStream) void {
-        self.data_points.deinit();
+        self.data_points.deinit(self.allocator);
     }
 
     pub fn shouldUpdate(self: AircraftTelemetryStream, current_time: types.SimTime) bool {
@@ -181,7 +181,7 @@ pub const AirportSensorNetwork = struct {
     }
 
     pub fn deinit(self: *AirportSensorNetwork) void {
-        self.sensors.deinit();
+        self.sensors.deinit(self.allocator);
     }
 
     pub fn addSensor(self: *AirportSensorNetwork, sensor: Sensor) !void {
@@ -296,8 +296,8 @@ pub const IoTDataAggregator = struct {
         for (self.airport_networks.items) |*network| {
             network.deinit();
         }
-        self.aircraft_streams.deinit();
-        self.airport_networks.deinit();
+        self.aircraft_streams.deinit(self.allocator);
+        self.airport_networks.deinit(self.allocator);
     }
 
     pub fn registerAircraft(self: *IoTDataAggregator, aircraft_id: u32) !void {

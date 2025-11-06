@@ -420,7 +420,7 @@ pub const Company = struct {
     }
 
     pub fn deinit(self: *Company) void {
-        self.owned_aircraft.deinit();
+        self.owned_aircraft.deinit(self.allocator);
     }
 
     pub fn addRevenue(self: *Company, amount: types.Money) void {

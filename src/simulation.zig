@@ -89,14 +89,14 @@ pub const SimulationWorld = struct {
     }
 
     pub fn deinit(self: *SimulationWorld) void {
-        self.airports.deinit();
-        self.aircraft.deinit();
-        self.cargo.deinit();
+        self.airports.deinit(self.allocator);
+        self.aircraft.deinit(self.allocator);
+        self.cargo.deinit(self.allocator);
         for (self.companies.items) |*company| {
             company.deinit();
         }
-        self.companies.deinit();
-        self.crew_members.deinit();
+        self.companies.deinit(self.allocator);
+        self.crew_members.deinit(self.allocator);
         self.flight_scheduler.deinit();
         self.weather_service.deinit();
         self.notam_service.deinit();

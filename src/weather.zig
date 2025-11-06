@@ -256,26 +256,13 @@ pub const WeatherService = struct {
             self.config.api_key,
         });
 
-        // Make HTTP request
-        var response_buffer: [8192]u8 = undefined;
-        var req = try self.http_client.open(.GET, try std.Uri.parse(url), .{
-            .server_header_buffer = &response_buffer,
-        });
-        defer req.deinit();
+        // TODO: HTTP Client API changed in Zig 0.15.1
+        // The .open() method no longer exists. Need to update to new API.
+        // For now, fall back to simulated weather.
+        _ = url;
 
-        try req.send();
-        try req.finish();
-        try req.wait();
-
-        // Read response
-        var response_data = std.ArrayList(u8){};
-        defer response_data.deinit();
-
-        const body = req.reader();
-        try body.readAllArrayList(&response_data, 16384);
-
-        // Parse JSON
-        return try WeatherData.fromOpenWeatherMapJSON(self.allocator, response_data.items);
+        // Fallback to simulated weather
+        return self.generateSimulatedWeather(latitude, longitude, timestamp);
     }
 
     fn generateSimulatedWeather(self: WeatherService, latitude: f32, longitude: f32, timestamp: u64) WeatherData {

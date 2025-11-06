@@ -89,9 +89,9 @@ pub const FlightPlan = struct {
     }
 
     pub fn deinit(self: *FlightPlan) void {
-        self.waypoints.deinit();
-        self.cargo_manifest.deinit();
-        self.assigned_crew.deinit();
+        self.waypoints.deinit(self.allocator);
+        self.cargo_manifest.deinit(self.allocator);
+        self.assigned_crew.deinit(self.allocator);
     }
 
     pub fn calculateRoute(
@@ -372,9 +372,9 @@ pub const FlightScheduler = struct {
         for (self.completed_flights.items) |*flight| {
             flight.deinit();
         }
-        self.scheduled_flights.deinit();
-        self.active_flights.deinit();
-        self.completed_flights.deinit();
+        self.scheduled_flights.deinit(self.allocator);
+        self.active_flights.deinit(self.allocator);
+        self.completed_flights.deinit(self.allocator);
     }
 
     pub fn addFlight(self: *FlightScheduler, flight: FlightPlan) !void {

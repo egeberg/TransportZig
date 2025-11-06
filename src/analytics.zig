@@ -522,10 +522,10 @@ pub const AdvancedAnalytics = struct {
         optimizations: std.ArrayList(OptimizationResult),
         recommendations: std.ArrayList(StrategicRecommendation),
 
-        pub fn deinit(self: *ComprehensiveAnalysisReport) void {
-            self.scenarios.deinit();
-            self.optimizations.deinit();
-            self.recommendations.deinit();
+        pub fn deinit(self: *ComprehensiveAnalysisReport, allocator: std.mem.Allocator) void {
+            self.scenarios.deinit(allocator);
+            self.optimizations.deinit(allocator);
+            self.recommendations.deinit(allocator);
         }
 
         pub fn printSummary(self: ComprehensiveAnalysisReport) void {
