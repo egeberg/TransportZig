@@ -520,8 +520,8 @@ pub const NotamService = struct {
             return std.ArrayList(Notam){};
         };
 
-        // Make HTTP request using fetch with allocator (Zig 0.15.1 API)
-        const result = self.http_client.fetch(self.allocator, .{
+        // Make HTTP request using fetch (Zig 0.15.1 API)
+        const result = self.http_client.fetch(.{
             .location = .{ .uri = uri },
             .method = .GET,
         }) catch |err| {

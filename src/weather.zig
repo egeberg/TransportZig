@@ -258,8 +258,8 @@ pub const WeatherService = struct {
         // Parse URI
         const uri = try std.Uri.parse(url);
 
-        // Make HTTP request using fetch with allocator (Zig 0.15.1 API)
-        const result = try self.http_client.fetch(self.allocator, .{
+        // Make HTTP request using fetch (Zig 0.15.1 API)
+        const result = try self.http_client.fetch(.{
             .location = .{ .uri = uri },
             .method = .GET,
         });
