@@ -23,6 +23,7 @@ pub const TelemetryPoint = struct {
 
 /// Aircraft telemetry stream
 pub const AircraftTelemetryStream = struct {
+    allocator: std.mem.Allocator,
     aircraft_id: u32,
     update_frequency_hz: f32, // Updates per second
     last_update: types.SimTime,
@@ -30,6 +31,7 @@ pub const AircraftTelemetryStream = struct {
 
     pub fn init(allocator: std.mem.Allocator, aircraft_id: u32) AircraftTelemetryStream {
         return .{
+            .allocator = allocator,
             .aircraft_id = aircraft_id,
             .update_frequency_hz = 1.0, // 1 Hz default
             .last_update = types.SimTime{ .seconds = 0 },
@@ -47,8 +49,8 @@ pub const AircraftTelemetryStream = struct {
         return elapsed >= update_interval;
     }
 
-    pub fn addDataPoint(self: *AircraftTelemetryStream, allocator: std.mem.Allocator, point: TelemetryPoint) !void {
-        try self.data_points.append(allocator, point);
+    pub fn addDataPoint(self: *AircraftTelemetryStream, point: TelemetryPoint) !void {
+        try self.data_points.append(self.allocator, point);
 
         // Keep only last 1000 points to prevent unbounded growth
         if (self.data_points.items.len > 1000) {
@@ -56,39 +58,39 @@ pub const AircraftTelemetryStream = struct {
         }
     }
 
-    pub fn collectTelemetry(self: *AircraftTelemetryStream, allocator: std.mem.Allocator, aircraft: *const entities.Aircraft, current_time: types.SimTime) !void {
+    pub fn collectTelemetry(self: *AircraftTelemetryStream, aircraft: *const entities.Aircraft, current_time: types.SimTime) !void {
         if (!self.shouldUpdate(current_time)) return;
 
         // Position
-        try self.addDataPoint(allocator, .{
+        try self.addDataPoint( .{
             .timestamp = current_time,
             .sensor_id = "position",
             .value = .{ .position = aircraft.current_position },
         });
 
         // Altitude
-        try self.addDataPoint(allocator, .{
+        try self.addDataPoint( .{
             .timestamp = current_time,
             .sensor_id = "altitude",
             .value = .{ .float = aircraft.current_altitude },
         });
 
         // Speed
-        try self.addDataPoint(allocator, .{
+        try self.addDataPoint( .{
             .timestamp = current_time,
             .sensor_id = "speed",
             .value = .{ .float = aircraft.current_speed },
         });
 
         // Heading
-        try self.addDataPoint(allocator, .{
+        try self.addDataPoint( .{
             .timestamp = current_time,
             .sensor_id = "heading",
             .value = .{ .float = aircraft.heading },
         });
 
         // Fuel
-        try self.addDataPoint(allocator, .{
+        try self.addDataPoint( .{
             .timestamp = current_time,
             .sensor_id = "fuel_remaining",
             .value = .{ .float = aircraft.telemetry.fuel_remaining },
@@ -103,7 +105,7 @@ pub const AircraftTelemetryStream = struct {
             );
             defer allocator.free(sensor_name);
 
-            try self.addDataPoint(allocator, .{
+            try self.addDataPoint( .{
                 .timestamp = current_time,
                 .sensor_id = sensor_name,
                 .value = .{ .bool = status },
@@ -128,6 +130,7 @@ pub const AircraftTelemetryStream = struct {
 
 /// Airport sensor network
 pub const AirportSensorNetwork = struct {
+    allocator: std.mem.Allocator,
     airport_id: u32,
     sensors: std.ArrayList(Sensor),
     alert_threshold: AlertThresholds,
@@ -170,6 +173,7 @@ pub const AirportSensorNetwork = struct {
 
     pub fn init(allocator: std.mem.Allocator, airport_id: u32) AirportSensorNetwork {
         return .{
+            .allocator = allocator,
             .airport_id = airport_id,
             .sensors = std.ArrayList(Sensor){},
             .alert_threshold = AlertThresholds{},
@@ -180,8 +184,8 @@ pub const AirportSensorNetwork = struct {
         self.sensors.deinit();
     }
 
-    pub fn addSensor(self: *AirportSensorNetwork, allocator: std.mem.Allocator, sensor: Sensor) !void {
-        try self.sensors.append(allocator, sensor);
+    pub fn addSensor(self: *AirportSensorNetwork, sensor: Sensor) !void {
+        try self.sensors.append(self.allocator, sensor);
     }
 
     pub fn updateSensors(self: *AirportSensorNetwork, airport: *const entities.Airport, current_time: types.SimTime) void {
@@ -305,7 +309,7 @@ pub const IoTDataAggregator = struct {
         var network = AirportSensorNetwork.init(self.allocator, airport_id);
 
         // Add default sensors
-        try network.addSensor(self.allocator, .{
+        try network.addSensor( .{
             .id = "weather_main",
             .sensor_type = .weather_station,
             .location = types.Coordinates{ .latitude = 0, .longitude = 0 },
@@ -314,7 +318,7 @@ pub const IoTDataAggregator = struct {
             .last_maintenance = types.SimTime{ .seconds = 0 },
         });
 
-        try network.addSensor(self.allocator, .{
+        try network.addSensor( .{
             .id = "wind_main",
             .sensor_type = .wind_sensor,
             .location = types.Coordinates{ .latitude = 0, .longitude = 0 },
@@ -323,7 +327,7 @@ pub const IoTDataAggregator = struct {
             .last_maintenance = types.SimTime{ .seconds = 0 },
         });
 
-        try network.addSensor(self.allocator, .{
+        try network.addSensor( .{
             .id = "visibility_main",
             .sensor_type = .visibility_sensor,
             .location = types.Coordinates{ .latitude = 0, .longitude = 0 },
@@ -345,7 +349,7 @@ pub const IoTDataAggregator = struct {
         for (self.aircraft_streams.items) |*stream| {
             for (aircraft_list) |*aircraft| {
                 if (aircraft.id == stream.aircraft_id) {
-                    try stream.collectTelemetry(self.allocator, aircraft, current_time);
+                    try stream.collectTelemetry(aircraft, current_time);
                     break;
                 }
             }

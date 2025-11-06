@@ -477,7 +477,7 @@ pub const NotamService = struct {
         _ = latitude;
         _ = longitude;
 
-        var notams = std.ArrayList(Notam){};
+        const notams = std.ArrayList(Notam){};
 
         // Build URL for FAA NOTAM search
         const icao_str = std.mem.sliceTo(&icao_code, 0);

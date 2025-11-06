@@ -434,7 +434,7 @@ pub const SensitivityAnalysis = struct {
 
 /// Generate comprehensive scenario report
 pub fn generateScenarioReport(
-    allocator: std.mem.Allocator,
+    _: std.mem.Allocator,
     scenarios: []const ScenarioOutcome,
 ) ![]u8 {
     var report = std.ArrayList(u8){};

@@ -383,6 +383,7 @@ pub const Cargo = struct {
 
 /// Company (airline operator)
 pub const Company = struct {
+    allocator: std.mem.Allocator,
     id: u32,
     name: []const u8,
     cash_balance: types.Money,
@@ -403,6 +404,7 @@ pub const Company = struct {
 
     pub fn init(allocator: std.mem.Allocator, id: u32, name: []const u8, starting_capital: types.Money) !Company {
         return .{
+            .allocator = allocator,
             .id = id,
             .name = name,
             .cash_balance = starting_capital,

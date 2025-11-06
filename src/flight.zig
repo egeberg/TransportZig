@@ -9,6 +9,7 @@ const economics = @import("economics.zig");
 
 /// Flight plan defining a route between airports
 pub const FlightPlan = struct {
+    allocator: std.mem.Allocator,
     id: u32,
     callsign: [8]u8, // e.g., "CRG001"
     aircraft_id: u32,
@@ -62,6 +63,7 @@ pub const FlightPlan = struct {
 
     pub fn init(allocator: std.mem.Allocator, id: u32, callsign: [8]u8, aircraft_id: u32) FlightPlan {
         return .{
+            .allocator = allocator,
             .id = id,
             .callsign = callsign,
             .aircraft_id = aircraft_id,
@@ -113,7 +115,7 @@ pub const FlightPlan = struct {
         self.planned_speed = aircraft_type.cruiseSpeed();
 
         // Create waypoints
-        try self.waypoints.append(allocator, .{
+        try self.waypoints.append(self.allocator, .{
             .position = departure.location,
             .name = departure.icao_code,
             .waypoint_type = .departure,
@@ -123,7 +125,7 @@ pub const FlightPlan = struct {
 
         // Climb waypoint (20% of route)
         const climb_factor = 0.2;
-        try self.waypoints.append(allocator, .{
+        try self.waypoints.append(self.allocator, .{
             .position = self.interpolatePosition(departure.location, arrival.location, climb_factor),
             .name = [_]u8{ 'C', 'L', 'I', 'M', 'B', 0, 0, 0 },
             .waypoint_type = .climb,
@@ -133,7 +135,7 @@ pub const FlightPlan = struct {
 
         // Cruise waypoint (60% of route)
         const cruise_factor = 0.6;
-        try self.waypoints.append(allocator, .{
+        try self.waypoints.append(self.allocator, .{
             .position = self.interpolatePosition(departure.location, arrival.location, cruise_factor),
             .name = [_]u8{ 'C', 'R', 'U', 'I', 'S', 'E', 0, 0 },
             .waypoint_type = .cruise,
@@ -143,7 +145,7 @@ pub const FlightPlan = struct {
 
         // Descent waypoint (90% of route)
         const descent_factor = 0.9;
-        try self.waypoints.append(allocator, .{
+        try self.waypoints.append(self.allocator, .{
             .position = self.interpolatePosition(departure.location, arrival.location, descent_factor),
             .name = [_]u8{ 'D', 'E', 'S', 'C', 'N', 'D', 0, 0 },
             .waypoint_type = .descent,
@@ -152,7 +154,7 @@ pub const FlightPlan = struct {
         });
 
         // Arrival waypoint
-        try self.waypoints.append(allocator, .{
+        try self.waypoints.append(self.allocator, .{
             .position = arrival.location,
             .name = arrival.icao_code,
             .waypoint_type = .arrival,
@@ -175,10 +177,10 @@ pub const FlightPlan = struct {
         };
     }
 
-    pub fn addCargo(self: *FlightPlan, allocator: std.mem.Allocator, cargo_id: u32, weight_tons: f32, volume_m3: f32) !bool {
+    pub fn addCargo(self: *FlightPlan, cargo_id: u32, weight_tons: f32, volume_m3: f32) !bool {
         self.total_cargo_weight += weight_tons;
         self.total_cargo_volume += volume_m3;
-        try self.cargo_manifest.append(allocator, cargo_id);
+        try self.cargo_manifest.append(self.allocator, cargo_id);
         return true;
     }
 
