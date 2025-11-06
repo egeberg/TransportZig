@@ -309,12 +309,78 @@ pub const RouteAnalyzer = struct {
     }
 
     pub fn findMostProfitableRoutes(
-        _: std.mem.Allocator,
-        _: *simulation.SimulationWorld,
-        _: usize,
+        allocator: std.mem.Allocator,
+        world: *simulation.SimulationWorld,
+        top_n: usize,
     ) !std.ArrayList(RoutePerformance) {
-        // Placeholder for route ranking algorithm
-        return std.ArrayList(RoutePerformance){};
+        // Build map of route pairs to performance metrics
+        var route_map = std.AutoHashMap(u64, RoutePerformance).init(allocator);
+        defer route_map.deinit();
+
+        // Analyze completed flights
+        for (world.flight_scheduler.completed_flights.items) |flight| {
+            // Create route key (combine departure and arrival IDs)
+            const route_key = (@as(u64, flight.departure_airport) << 32) | @as(u64, flight.arrival_airport);
+
+            // Get or create route performance entry
+            var route_perf = route_map.get(route_key) orelse RoutePerformance{
+                .route_name = try std.fmt.allocPrint(allocator, "Route {d}-{d}", .{ flight.departure_airport, flight.arrival_airport }),
+                .departure_id = flight.departure_airport,
+                .arrival_id = flight.arrival_airport,
+                .flights_completed = 0,
+                .total_distance_km = 0,
+                .total_revenue = types.Money.init(0),
+                .total_costs = types.Money.init(0),
+                .total_cargo_kg = 0,
+                .average_load_factor = 0,
+                .profit_margin = 0,
+            };
+
+            // Update metrics
+            route_perf.flights_completed += 1;
+            route_perf.total_distance_km += flight.total_distance_km;
+            route_perf.total_revenue = route_perf.total_revenue.add(flight.estimated_revenue);
+            route_perf.total_costs = route_perf.total_costs.add(flight.estimated_cost);
+            route_perf.total_cargo_kg += flight.total_cargo_weight * 1000.0; // tons to kg
+
+            try route_map.put(route_key, route_perf);
+        }
+
+        // Convert to list and sort by profit
+        var routes = std.ArrayList(RoutePerformance).init(allocator);
+        var iter = route_map.valueIterator();
+        while (iter.next()) |route| {
+            var r = route.*;
+            // Calculate profit margin
+            const rev = r.total_revenue.toDollars();
+            if (rev > 0) {
+                const profit = r.total_revenue.subtract(r.total_costs);
+                r.profit_margin = (profit.toDollars() / rev) * 100.0;
+            }
+            try routes.append(allocator, r);
+        }
+
+        // Sort by profit (descending)
+        std.mem.sort(RoutePerformance, routes.items, {}, struct {
+            fn lessThan(_: void, a: RoutePerformance, b: RoutePerformance) bool {
+                const a_profit = a.total_revenue.subtract(a.total_costs).toDollars();
+                const b_profit = b.total_revenue.subtract(b.total_costs).toDollars();
+                return a_profit > b_profit;
+            }
+        }.lessThan);
+
+        // Return top N routes
+        if (routes.items.len > top_n) {
+            const result = std.ArrayList(RoutePerformance).init(allocator);
+            var i: usize = 0;
+            while (i < top_n and i < routes.items.len) : (i += 1) {
+                try result.append(allocator, routes.items[i]);
+            }
+            routes.deinit(allocator);
+            return result;
+        }
+
+        return routes;
     }
 };
 

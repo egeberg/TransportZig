@@ -240,12 +240,42 @@ pub const NotamParser = struct {
 
         if (q_line) |q| {
             // Q line format includes coordinates: .../XXXXNYYYYYYW999
-            // Try to extract coordinates
+            // Format: DDMM[SS]N/SDDDMM[SS]E/W where DD=degrees, MM=minutes, SS=seconds (optional)
+            // Example: 4012N07345W = 40°12'N, 073°45'W
             if (std.mem.indexOf(u8, q, "N")) |n_pos| {
-                if (std.mem.indexOf(u8, q[n_pos..], "W")) |_| {
-                    // Parse lat/lon (simplified)
-                    latitude = 40.0; // Placeholder
-                    longitude = -73.0; // Placeholder
+                // Look for latitude before N
+                if (n_pos >= 4) {
+                    const lat_str = q[n_pos - 4 .. n_pos];
+                    const lat_deg = std.fmt.parseInt(u32, lat_str[0..2], 10) catch 0;
+                    const lat_min = std.fmt.parseInt(u32, lat_str[2..4], 10) catch 0;
+                    latitude = @as(f32, @floatFromInt(lat_deg)) + (@as(f32, @floatFromInt(lat_min)) / 60.0);
+                }
+
+                // Look for longitude after N
+                if (std.mem.indexOf(u8, q[n_pos..], "W")) |w_offset| {
+                    const w_pos = n_pos + w_offset;
+                    if (w_pos > n_pos + 1 and w_pos - n_pos >= 6) {
+                        const lon_str = q[w_pos - 5 .. w_pos];
+                        const lon_deg = std.fmt.parseInt(u32, lon_str[0..3], 10) catch 0;
+                        const lon_min = std.fmt.parseInt(u32, lon_str[3..5], 10) catch 0;
+                        longitude = -(@as(f32, @floatFromInt(lon_deg)) + (@as(f32, @floatFromInt(lon_min)) / 60.0));
+                    }
+                } else if (std.mem.indexOf(u8, q[n_pos..], "E")) |e_offset| {
+                    const e_pos = n_pos + e_offset;
+                    if (e_pos > n_pos + 1 and e_pos - n_pos >= 6) {
+                        const lon_str = q[e_pos - 5 .. e_pos];
+                        const lon_deg = std.fmt.parseInt(u32, lon_str[0..3], 10) catch 0;
+                        const lon_min = std.fmt.parseInt(u32, lon_str[3..5], 10) catch 0;
+                        longitude = @as(f32, @floatFromInt(lon_deg)) + (@as(f32, @floatFromInt(lon_min)) / 60.0);
+                    }
+                }
+            } else if (std.mem.indexOf(u8, q, "S")) |s_pos| {
+                // Southern hemisphere
+                if (s_pos >= 4) {
+                    const lat_str = q[s_pos - 4 .. s_pos];
+                    const lat_deg = std.fmt.parseInt(u32, lat_str[0..2], 10) catch 0;
+                    const lat_min = std.fmt.parseInt(u32, lat_str[2..4], 10) catch 0;
+                    latitude = -(@as(f32, @floatFromInt(lat_deg)) + (@as(f32, @floatFromInt(lat_min)) / 60.0));
                 }
             }
         }
@@ -477,8 +507,6 @@ pub const NotamService = struct {
         _ = latitude;
         _ = longitude;
 
-        const notams = std.ArrayList(Notam){};
-
         // Build URL for FAA NOTAM search
         const icao_str = std.mem.sliceTo(&icao_code, 0);
         var url_buffer: [512]u8 = undefined;
@@ -487,12 +515,46 @@ pub const NotamService = struct {
             .{ self.config.faa_endpoint, icao_str }
         );
 
-        // TODO: HTTP Client API changed in Zig 0.15.1
-        // The .open() method no longer exists. Need to update to new API.
-        // For now, fall back to simulated NOTAMs.
-        _ = url;
+        // Parse URI
+        const uri = std.Uri.parse(url) catch |err| {
+            std.debug.print("Failed to parse NOTAM URL: {}\n", .{err});
+            return std.ArrayList(Notam){};
+        };
 
-        // Return empty list (simulated NOTAMs will be used instead)
+        // Allocate buffer for response
+        var response_buffer = std.ArrayList(u8).init(self.allocator);
+        defer response_buffer.deinit();
+
+        // Make HTTP request using fetch API
+        const fetch_result = self.http_client.fetch(.{
+            .location = .{ .uri = uri },
+            .method = .GET,
+            .response_storage = .{ .dynamic = &response_buffer },
+        }) catch |err| {
+            std.debug.print("NOTAM API request failed: {}\n", .{err});
+            return std.ArrayList(Notam){};
+        };
+
+        // Check status
+        if (fetch_result.status != .ok) {
+            std.debug.print("NOTAM API returned status: {}\n", .{fetch_result.status});
+            return std.ArrayList(Notam){};
+        }
+
+        // Parse response - FAA API typically returns JSON or text format
+        // Try to parse as newline-delimited NOTAM text
+        var notams = std.ArrayList(Notam){};
+        var parser = NotamParser.init(self.allocator);
+
+        var line_iter = std.mem.splitScalar(u8, response_buffer.items, '\n');
+        while (line_iter.next()) |line| {
+            if (line.len == 0) continue;
+
+            // Try to parse each line as a NOTAM
+            const notam = parser.parseICAO(line) catch continue;
+            try notams.append(self.allocator, notam);
+        }
+
         return notams;
     }
 

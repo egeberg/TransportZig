@@ -425,16 +425,54 @@ pub const IoTDataAggregator = struct {
 /// Real-time data export for external systems
 pub const DataExporter = struct {
     pub fn exportToJSON(allocator: std.mem.Allocator, telemetry: AircraftTelemetryStream) ![]u8 {
-        _ = allocator;
-        _ = telemetry;
-        // Placeholder for JSON export functionality
-        return "{}";
+        var buffer = std.ArrayList(u8).init(allocator);
+        var writer = buffer.writer();
+
+        try writer.writeAll("{");
+        try writer.print("\"aircraft_id\":{d},", .{telemetry.aircraft_id});
+        try writer.print("\"update_frequency_hz\":{d:.2},", .{telemetry.update_frequency_hz});
+        try writer.print("\"last_update\":{d},", .{telemetry.last_update.seconds});
+        try writer.writeAll("\"data_points\":[");
+
+        for (telemetry.data_points.items, 0..) |point, i| {
+            if (i > 0) try writer.writeAll(",");
+            try writer.writeAll("{");
+            try writer.print("\"timestamp\":{d},", .{point.timestamp.seconds});
+            try writer.print("\"sensor_id\":\"{s}\",", .{point.sensor_id});
+            try writer.writeAll("\"value\":");
+
+            switch (point.value) {
+                .float => |v| try writer.print("{d:.2}", .{v}),
+                .position => |v| try writer.print("{{\"lat\":{d:.4},\"lon\":{d:.4}}}", .{ v.latitude, v.longitude }),
+                .boolean => |v| try writer.print("{}", .{v}),
+                .integer => |v| try writer.print("{d}", .{v}),
+            }
+            try writer.writeAll("}");
+        }
+
+        try writer.writeAll("]}");
+        return buffer.toOwnedSlice();
     }
 
     pub fn exportToCSV(allocator: std.mem.Allocator, telemetry: AircraftTelemetryStream) ![]u8 {
-        _ = allocator;
-        _ = telemetry;
-        // Placeholder for CSV export functionality
-        return "";
+        var buffer = std.ArrayList(u8).init(allocator);
+        var writer = buffer.writer();
+
+        // Header
+        try writer.writeAll("timestamp,sensor_id,value_type,value\n");
+
+        // Data rows
+        for (telemetry.data_points.items) |point| {
+            try writer.print("{d},{s},", .{ point.timestamp.seconds, point.sensor_id });
+
+            switch (point.value) {
+                .float => |v| try writer.print("float,{d:.2}\n", .{v}),
+                .position => |v| try writer.print("position,\"{d:.4}:{d:.4}\"\n", .{ v.latitude, v.longitude }),
+                .boolean => |v| try writer.print("boolean,{}\n", .{v}),
+                .integer => |v| try writer.print("integer,{d}\n", .{v}),
+            }
+        }
+
+        return buffer.toOwnedSlice();
     }
 };

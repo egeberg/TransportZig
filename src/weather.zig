@@ -249,21 +249,36 @@ pub const WeatherService = struct {
     fn fetchFromAPI(self: *WeatherService, latitude: f32, longitude: f32) !WeatherData {
         // Build URL
         var url_buffer: [512]u8 = undefined;
-        const url = try std.fmt.bufPrint(&url_buffer, "{s}?lat={d:.4}&lon={d:.4}&appid={s}", .{
+        const url = try std.fmt.bufPrint(&url_buffer, "{s}?lat={d:.4}&lon={d:.4}&appid={s}&units=metric", .{
             self.config.api_endpoint,
             latitude,
             longitude,
             self.config.api_key,
         });
 
-        // TODO: HTTP Client API changed in Zig 0.15.1
-        // The .open() method no longer exists. Need to update to new API.
-        // For now, fall back to simulated weather.
-        _ = url;
+        // Parse URI
+        const uri = try std.Uri.parse(url);
 
-        // Fallback to simulated weather (use current time as timestamp)
-        const now = @as(u64, @intCast(std.time.timestamp()));
-        return self.generateSimulatedWeather(latitude, longitude, now);
+        // Allocate buffer for response
+        var response_buffer = std.ArrayList(u8).init(self.allocator);
+        defer response_buffer.deinit();
+
+        // Make HTTP request using fetch API
+        const fetch_result = try self.http_client.fetch(.{
+            .location = .{ .uri = uri },
+            .method = .GET,
+            .response_storage = .{ .dynamic = &response_buffer },
+        });
+
+        // Check status
+        if (fetch_result.status != .ok) {
+            std.debug.print("Weather API returned status: {}\n", .{fetch_result.status});
+            const now = @as(u64, @intCast(std.time.timestamp()));
+            return self.generateSimulatedWeather(latitude, longitude, now);
+        }
+
+        // Parse JSON response
+        return try WeatherData.fromOpenWeatherMapJSON(self.allocator, response_buffer.items);
     }
 
     fn generateSimulatedWeather(self: WeatherService, latitude: f32, longitude: f32, timestamp: u64) WeatherData {
