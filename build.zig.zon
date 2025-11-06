@@ -1,6 +1,7 @@
 .{
     .name = .aviation_transport_sim,
     .version = "0.1.0",
+    .fingerprint = 0xd898c8a1e9a4b12,
     .paths = .{
         "build.zig",
         "build.zig.zon",
