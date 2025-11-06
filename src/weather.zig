@@ -227,23 +227,22 @@ pub const WeatherService = struct {
             }
         }
 
-        // Fetch from API if enabled
-        if (self.config.enabled) {
-            const weather_data = try self.fetchFromAPI(latitude, longitude);
-
-            // Update cache
-            try self.cache.put(airport_id, .{
-                .data = weather_data,
-                .fetched_at = now,
-                .latitude = latitude,
-                .longitude = longitude,
-            });
-
-            return weather_data;
-        } else {
-            // Return simulated weather if API not enabled
-            return self.generateSimulatedWeather(latitude, longitude, now);
+        // Fetch from API (API must be enabled)
+        if (!self.config.enabled) {
+            return error.WeatherAPIDisabled;
         }
+
+        const weather_data = try self.fetchFromAPI(latitude, longitude);
+
+        // Update cache
+        try self.cache.put(airport_id, .{
+            .data = weather_data,
+            .fetched_at = now,
+            .latitude = latitude,
+            .longitude = longitude,
+        });
+
+        return weather_data;
     }
 
     fn fetchFromAPI(self: *WeatherService, latitude: f32, longitude: f32) !WeatherData {
@@ -272,61 +271,11 @@ pub const WeatherService = struct {
 
         // Check status
         if (fetch_result.status != .ok) {
-            std.debug.print("Weather API returned status: {}\n", .{fetch_result.status});
-            const now = @as(u64, @intCast(std.time.timestamp()));
-            return self.generateSimulatedWeather(latitude, longitude, now);
+            return error.WeatherAPIBadStatus;
         }
 
         // Parse JSON response
         return try WeatherData.fromOpenWeatherMapJSON(self.allocator, response_buffer.items);
-    }
-
-    fn generateSimulatedWeather(self: WeatherService, latitude: f32, longitude: f32, timestamp: u64) WeatherData {
-        _ = self;
-
-        // Simple weather simulation based on location and time
-        const time_factor = @as(f32, @floatFromInt(timestamp % 86400)) / 86400.0;
-        const lat_factor = @abs(latitude) / 90.0;
-
-        // Temperature varies by latitude and time of day
-        const base_temp = 15.0 + (1.0 - lat_factor) * 15.0; // Warmer near equator
-        const daily_variation = @sin(time_factor * 2.0 * std.math.pi) * 10.0;
-        const temperature = base_temp + daily_variation;
-
-        // Wind speed varies with location
-        const wind_speed = 10.0 + @sin(@as(f32, @floatFromInt(timestamp)) / 3600.0) * 15.0;
-
-        // Visibility and conditions
-        const random_factor = @mod(@as(f32, @floatFromInt(timestamp)), 1000.0) / 1000.0;
-        const condition = if (random_factor < 0.6)
-            WeatherData.WeatherConditionCode.clear
-        else if (random_factor < 0.8)
-            WeatherData.WeatherConditionCode.few_clouds
-        else if (random_factor < 0.9)
-            WeatherData.WeatherConditionCode.rain
-        else
-            WeatherData.WeatherConditionCode.broken_clouds;
-
-        return WeatherData{
-            .temperature = temperature,
-            .feels_like = temperature - 2.0,
-            .pressure = 1013.25,
-            .humidity = 60,
-            .visibility = if (condition == .rain) 5.0 else 10.0,
-            .wind_speed = wind_speed,
-            .wind_direction = @mod(longitude * 10.0, 360.0),
-            .wind_gust = if (wind_speed > 20) wind_speed * 1.3 else null,
-            .clouds = switch (condition) {
-                .clear => 0,
-                .few_clouds => 25,
-                .broken_clouds => 75,
-                else => 50,
-            },
-            .rain_1h = if (condition == .rain) 2.0 else null,
-            .snow_1h = null,
-            .weather_condition = condition,
-            .timestamp = timestamp,
-        };
     }
 
     /// Update weather for all airports

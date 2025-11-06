@@ -493,8 +493,7 @@ pub const NotamService = struct {
             try self.cache.put(airport_id, airport_notams);
             return airport_notams;
         } else {
-            // Generate simulated NOTAMs
-            return try self.generateSimulatedNotams(airport_id, icao_code, now);
+            return error.NotamAPIDisabled;
         }
     }
 
@@ -556,76 +555,6 @@ pub const NotamService = struct {
         }
 
         return notams;
-    }
-
-    fn generateSimulatedNotams(
-        self: *NotamService,
-        airport_id: u32,
-        icao_code: [4]u8,
-        timestamp: u64,
-    ) !AirportNotams {
-        const icao_str = std.mem.sliceTo(&icao_code, 0);
-        var notams = std.ArrayList(Notam){};
-
-        // Generate 1-3 simulated NOTAMs per airport
-        const notam_count = 1 + (@mod(airport_id, 3));
-
-        var i: u32 = 0;
-        while (i < notam_count) : (i += 1) {
-            const category: NotamCategory = switch (@mod(airport_id + i, 8)) {
-                0 => .construction,
-                1 => .taxiway_closure,
-                2 => .lighting_unserviceable,
-                3 => .navaid_limited,
-                4 => .bird_activity,
-                5 => .general_warning,
-                6 => .fuel_unavailable,
-                else => .other,
-            };
-
-            const start_time = timestamp - 86400; // Started yesterday
-            const end_time = timestamp + (7 * 86400); // Ends in 7 days
-
-            const id = try std.fmt.allocPrint(self.allocator, "!{s} {d}/{d:0>3}", .{ icao_str, @mod(timestamp / 86400, 100), i + 1 });
-            const subject = try std.fmt.allocPrint(self.allocator, "{s} - {s}", .{ icao_str, @tagName(category) });
-            const condition = try std.fmt.allocPrint(self.allocator,
-                "SIMULATED NOTAM FOR TESTING - {s}",
-                .{ @tagName(category) }
-            );
-            const raw = try std.fmt.allocPrint(self.allocator,
-                "Q) KZNY/Q{s}/IV/BO/A/000/999/\nA) {s}\nB) {d}\nC) {d}\nE) {s}",
-                .{ "XXXX", icao_str, start_time, end_time, condition }
-            );
-
-            try notams.append(self.allocator, Notam{
-                .id = id,
-                .location = try self.allocator.dupe(u8, icao_str),
-                .category = category,
-                .severity = category.getSeverity(),
-                .start_time = start_time,
-                .end_time = end_time,
-                .is_permanent = false,
-                .subject = subject,
-                .condition = condition,
-                .raw_text = raw,
-                .affected_runway = null,
-                .affected_navaid = null,
-                .latitude = null,
-                .longitude = null,
-                .radius_nm = null,
-                .lower_limit_ft = null,
-                .upper_limit_ft = null,
-                .schedule = null,
-            });
-        }
-
-        return AirportNotams{
-            .airport_id = airport_id,
-            .notams = notams,
-            .fetched_at = timestamp,
-            .active_count = @intCast(notams.items.len),
-            .critical_count = 0,
-        };
     }
 
     /// Update NOTAMs for all airports
