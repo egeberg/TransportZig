@@ -35,12 +35,21 @@ A professional aviation cargo transport simulation with 3D visualization, IoT in
 - **Alert System**: Critical condition monitoring and notifications
 - **Data Export**: JSON/CSV export capabilities for external systems
 
-### 3D Visualization (Raylib)
-- **Interactive 3D World**: Global map with airports and aircraft
-- **Flight Path Rendering**: Visual representation of routes and waypoints
-- **Real-time Updates**: Aircraft positions update during flight
-- **Camera Controls**: Rotate, zoom, and navigate the 3D environment
-- **HUD Overlay**: Flight statistics, financial metrics, market conditions
+### User Interface
+- **Business Dashboard (Capy UI)**: Native cross-platform GUI
+  - KPI cards with real-time metrics
+  - Flight list table with status and progress
+  - Airport status panel with slot availability
+  - Weather conditions display per airport
+  - Active NOTAMs with severity indicators
+  - Control buttons (pause, analytics, export, settings)
+  - Native look and feel on Windows, macOS, Linux
+- **3D Visualization (Raylib)**: Optional 3D view
+  - Interactive 3D world with global map
+  - Flight path rendering and waypoints
+  - Real-time aircraft position updates
+  - Camera controls (rotate, zoom, navigate)
+  - HUD overlay with statistics
 
 ### Business Analytics
 - **KPI Dashboard**: 20+ key performance indicators
@@ -55,6 +64,7 @@ A professional aviation cargo transport simulation with 3D visualization, IoT in
 ```
 src/
 ├── main.zig           - Main application loop
+├── ui.zig            - Capy UI business dashboard
 ├── types.zig          - Core type definitions
 ├── entities.zig       - Aircraft, airports, cargo, companies
 ├── economics.zig      - Financial models and calculations
@@ -63,7 +73,7 @@ src/
 ├── iot.zig           - IoT telemetry and sensor networks
 ├── weather.zig       - Real-world weather data integration
 ├── notam.zig         - NOTAM fetching, parsing, and decoding
-├── renderer.zig      - 3D visualization with raylib
+├── renderer.zig      - 3D visualization with raylib (optional)
 └── analytics.zig     - Business intelligence and KPIs
 ```
 
@@ -79,7 +89,12 @@ src/
 
 ### Requirements
 - Zig 0.13.0 or later
-- raylib (system library)
+- Capy UI (installed via Zig package manager)
+- raylib (system library, optional for 3D view)
+- Platform-specific:
+  - **Linux**: GTK3 development libraries (`libgtk-3-dev`)
+  - **Windows**: Win32 API (included)
+  - **macOS**: AppKit (included)
 
 ### Build Commands
 ```bash
@@ -110,6 +125,28 @@ The application can use real-world weather data from OpenWeatherMap:
    ```
 
 If no API key is provided, the application will use simulated weather data.
+
+### User Interface
+
+The application uses **Capy UI** for a native, cross-platform business dashboard:
+
+**Features:**
+- Native look and feel on each platform (GTK3/Win32/AppKit)
+- Real-time KPI cards (revenue, profit, fleet utilization)
+- Dynamic flight table with progress indicators
+- Airport status monitoring
+- Weather conditions per airport
+- NOTAM viewer with severity highlighting
+- Control panel with action buttons
+
+**Platform Support:**
+- **Linux**: Uses GTK3 for native Linux desktop integration
+- **Windows**: Uses Win32 API for native Windows look
+- **macOS**: Uses AppKit for native macOS experience
+- **Web**: Can compile to WebAssembly for browser-based access
+
+Capy UI provides a modern, responsive interface perfect for business applications,
+with automatic theming and accessibility support.
 
 ### NOTAM Integration
 
@@ -239,12 +276,14 @@ This is a business simulation application for educational and demonstration purp
 ✅ IoT integration layer
 ✅ Real-world weather data integration (OpenWeatherMap API)
 ✅ NOTAM fetching, parsing and decoding (FAA/ICAO)
-✅ 3D visualization
-✅ Business analytics
+✅ Capy UI native business dashboard
+✅ 3D visualization (optional)
+✅ Business analytics and KPI tracking
 ✅ Flight management system
 ✅ Cargo handling
 ✅ Multi-airport network
 ✅ Weather alerts and operational impact
 ✅ NOTAM operational impact assessment
+✅ Cross-platform native GUI (Linux/Windows/macOS)
 
-Ready for testing and deployment as an IoT-enabled business solution!
+Ready for testing and deployment as an IoT-enabled business solution with professional UI!

@@ -11,9 +11,16 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    // Link raylib for 3D visualization
+    // Link raylib for 3D visualization (optional)
     exe.linkSystemLibrary("raylib");
     exe.linkLibC();
+
+    // Add Capy UI dependency for business dashboard
+    const capy_dep = b.dependency("capy", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    exe.root_module.addImport("capy", capy_dep.module("capy"));
 
     b.installArtifact(exe);
 
