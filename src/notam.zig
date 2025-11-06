@@ -415,7 +415,7 @@ pub const NotamService = struct {
                 if (notam.affected_runway) |rwy| self.allocator.free(rwy);
                 if (notam.affected_navaid) |nav| self.allocator.free(nav);
             }
-            airport_notams.notams.deinit();
+            airport_notams.notams.deinit(self.allocator);
         }
         self.cache.deinit();
         self.http_client.deinit();

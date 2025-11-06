@@ -261,8 +261,9 @@ pub const WeatherService = struct {
         // For now, fall back to simulated weather.
         _ = url;
 
-        // Fallback to simulated weather
-        return self.generateSimulatedWeather(latitude, longitude, timestamp);
+        // Fallback to simulated weather (use current time as timestamp)
+        const now = @as(u64, @intCast(std.time.timestamp()));
+        return self.generateSimulatedWeather(latitude, longitude, now);
     }
 
     fn generateSimulatedWeather(self: WeatherService, latitude: f32, longitude: f32, timestamp: u64) WeatherData {
