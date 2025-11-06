@@ -520,20 +520,45 @@ pub const NotamService = struct {
             return std.ArrayList(Notam){};
         };
 
-        // Make HTTP request using fetch API (Zig 0.15.1)
-        const fetch_result = self.http_client.fetch(.{
-            .location = .{ .uri = uri },
-            .method = .GET,
-            .max_append_size = 16 * 1024 * 1024, // 16MB max response
+        // Buffer for response
+        var response_buffer = std.ArrayList(u8){};
+        defer response_buffer.deinit(self.allocator);
+
+        // Header buffer for request
+        var header_buffer: [4096]u8 = undefined;
+
+        // Create and send HTTP request (Zig 0.15.1 API)
+        var request = self.http_client.open(.GET, uri, .{
+            .server_header_buffer = &header_buffer,
         }) catch |err| {
+            std.debug.print("Failed to create NOTAM request: {}\n", .{err});
+            return std.ArrayList(Notam){};
+        };
+        defer request.deinit();
+
+        request.send() catch |err| {
             std.debug.print("NOTAM API request failed: {}\n", .{err});
+            return std.ArrayList(Notam){};
+        };
+        request.finish() catch {
+            return std.ArrayList(Notam){};
+        };
+        request.wait() catch {
             return std.ArrayList(Notam){};
         };
 
         // Check status
-        if (fetch_result.status != .ok) {
-            std.debug.print("NOTAM API returned status: {}\n", .{fetch_result.status});
+        if (request.response.status != .ok) {
+            std.debug.print("NOTAM API returned status: {}\n", .{request.response.status});
             return std.ArrayList(Notam){};
+        }
+
+        // Read response body
+        var read_buffer: [4096]u8 = undefined;
+        while (true) {
+            const bytes_read = request.readAll(&read_buffer) catch break;
+            if (bytes_read == 0) break;
+            response_buffer.appendSlice(self.allocator, read_buffer[0..bytes_read]) catch break;
         }
 
         // Parse response - FAA API typically returns JSON or text format
@@ -541,7 +566,7 @@ pub const NotamService = struct {
         var notams = std.ArrayList(Notam){};
         var parser = NotamParser.init(self.allocator);
 
-        var line_iter = std.mem.splitScalar(u8, fetch_result.body, '\n');
+        var line_iter = std.mem.splitScalar(u8, response_buffer.items, '\n');
         while (line_iter.next()) |line| {
             if (line.len == 0) continue;
 
