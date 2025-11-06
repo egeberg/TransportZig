@@ -258,38 +258,20 @@ pub const WeatherService = struct {
         // Parse URI
         const uri = try std.Uri.parse(url);
 
-        // Buffer for response
-        var response_buffer = std.ArrayList(u8){};
-        defer response_buffer.deinit(self.allocator);
-
-        // Header buffer for request
-        var header_buffer: [4096]u8 = undefined;
-
-        // Create and send HTTP request (Zig 0.15.1 API)
-        var request = try self.http_client.open(.GET, uri, .{
-            .server_header_buffer = &header_buffer,
+        // Make HTTP request using fetch with allocator (Zig 0.15.1 API)
+        const result = try self.http_client.fetch(self.allocator, .{
+            .location = .{ .uri = uri },
+            .method = .GET,
         });
-        defer request.deinit();
-
-        try request.send();
-        try request.finish();
-        try request.wait();
+        defer result.deinit();
 
         // Check status
-        if (request.response.status != .ok) {
+        if (result.status != .ok) {
             return error.WeatherAPIBadStatus;
         }
 
-        // Read response body
-        var read_buffer: [4096]u8 = undefined;
-        while (true) {
-            const bytes_read = try request.readAll(&read_buffer);
-            if (bytes_read == 0) break;
-            try response_buffer.appendSlice(self.allocator, read_buffer[0..bytes_read]);
-        }
-
-        // Parse JSON response
-        return try WeatherData.fromOpenWeatherMapJSON(self.allocator, response_buffer.items);
+        // Parse JSON response from body
+        return try WeatherData.fromOpenWeatherMapJSON(self.allocator, result.body);
     }
 
     /// Update weather for all airports
