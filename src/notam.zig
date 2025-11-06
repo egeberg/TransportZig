@@ -528,7 +528,7 @@ pub const NotamService = struct {
             std.debug.print("NOTAM API request failed: {}\n", .{err});
             return std.ArrayList(Notam){};
         };
-        defer result.deinit();
+        defer self.allocator.free(result.body);
 
         // Check status
         if (result.status != .ok) {

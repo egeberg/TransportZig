@@ -263,7 +263,7 @@ pub const WeatherService = struct {
             .location = .{ .uri = uri },
             .method = .GET,
         });
-        defer result.deinit();
+        defer self.allocator.free(result.body);
 
         // Check status
         if (result.status != .ok) {
