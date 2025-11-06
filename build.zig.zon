@@ -1,12 +1,6 @@
 .{
-    .name = "aviation-transport-sim",
+    .name = "aviation_transport_sim",
     .version = "0.1.0",
-    .dependencies = .{
-        .capy = .{
-            .url = "https://github.com/capy-ui/capy/archive/refs/heads/main.tar.gz",
-            .hash = "12200000000000000000000000000000000000000000000000000000000000000000",
-        },
-    },
     .paths = .{
         "build.zig",
         "build.zig.zon",

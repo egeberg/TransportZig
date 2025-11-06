@@ -5,10 +5,11 @@ const economics = @import("economics.zig");
 const simulation = @import("simulation.zig");
 const flight = @import("flight.zig");
 const iot = @import("iot.zig");
-const renderer = @import("renderer.zig");
+// const renderer = @import("renderer.zig"); // Optional: requires raylib
 const analytics = @import("analytics.zig");
 const weather = @import("weather.zig");
 const notam = @import("notam.zig");
+// const ui = @import("ui.zig"); // Optional: requires Capy UI
 
 // ============================================================================
 // AVIATION TRANSPORT SIMULATION - MAIN APPLICATION
@@ -44,56 +45,44 @@ pub fn main() !void {
     // Set up demo scenario
     try setupDemoScenario(&world, &iot_aggregator);
 
-    // Initialize 3D renderer
-    renderer.initWindow();
-    defer renderer.closeWindow();
-
-    var render_engine = renderer.Renderer.init();
-
     // Simulation state
-    var paused = false;
-    var show_analytics = false;
     var last_analytics_time: u64 = 0;
+    const simulation_days = 30; // Run for 30 simulated days
 
     std.debug.print("Simulation initialized successfully!\n", .{});
-    std.debug.print("Starting main loop...\n\n", .{});
+    std.debug.print("Running headless simulation for {d} days...\n\n", .{simulation_days});
 
-    // Main application loop
-    while (!renderer.shouldClose()) {
-        const delta = 1.0 / 60.0; // 60 FPS
+    // Main application loop (headless mode)
+    var updates: u32 = 0;
+    const updates_per_day = 60 * 60 * 24; // Simulate 24 hours per day
+    const max_updates = updates_per_day * simulation_days;
 
-        // Handle input
-        if (std.c.getchar() == ' ') { // Note: non-blocking input would be better
-            paused = !paused;
-        }
+    while (updates < max_updates) : (updates += 1) {
+        const delta = 1.0; // 1 second per update
 
         // Update simulation
-        if (!paused) {
-            try world.update(delta);
+        try world.update(delta);
 
-            // Collect IoT telemetry
+        // Collect IoT telemetry periodically
+        if (@mod(updates, 3600) == 0) { // Every hour
             try iot_aggregator.collectAllTelemetry(
                 world.aircraft.items,
                 world.airports.items,
                 world.current_time,
             );
-
-            // Print analytics every 10 simulation days
-            const current_day = world.current_time.seconds / 86400;
-            if (current_day > 0 and current_day != last_analytics_time and @mod(current_day, 10) == 0) {
-                last_analytics_time = current_day;
-                show_analytics = true;
-            }
-
-            if (show_analytics) {
-                printAnalytics(&world, &iot_aggregator);
-                show_analytics = false;
-            }
         }
 
-        // Render 3D visualization
-        render_engine.updateCamera();
-        render_engine.render(&world);
+        // Print analytics every 10 simulation days
+        const current_day = world.current_time.seconds / 86400;
+        if (current_day > 0 and current_day != last_analytics_time and @mod(current_day, 10) == 0) {
+            last_analytics_time = current_day;
+            printAnalytics(&world, &iot_aggregator);
+        }
+
+        // Print progress
+        if (@mod(updates, updates_per_day) == 0) {
+            std.debug.print("Day {d}/{d} completed\n", .{ updates / updates_per_day, simulation_days });
+        }
     }
 
     // Final report

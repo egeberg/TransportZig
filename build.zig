@@ -11,16 +11,18 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    // Link raylib for 3D visualization (optional)
-    exe.linkSystemLibrary("raylib");
+    // Link raylib for 3D visualization (optional - comment out if not available)
+    // exe.linkSystemLibrary("raylib");
     exe.linkLibC();
 
-    // Add Capy UI dependency for business dashboard
-    const capy_dep = b.dependency("capy", .{
-        .target = target,
-        .optimize = optimize,
-    });
-    exe.root_module.addImport("capy", capy_dep.module("capy"));
+    // Note: Capy UI dependency can be added when available
+    // For now, the UI module serves as a design reference
+    // To add Capy: uncomment dependencies in build.zig.zon and the lines below
+    // const capy_dep = b.dependency("capy", .{
+    //     .target = target,
+    //     .optimize = optimize,
+    // });
+    // exe.root_module.addImport("capy", capy_dep.module("capy"));
 
     b.installArtifact(exe);
 
