@@ -99,11 +99,11 @@ pub const AircraftTelemetryStream = struct {
         // Engine status
         for (aircraft.telemetry.engine_status, 0..) |status, i| {
             const sensor_name = try std.fmt.allocPrint(
-                allocator,
+                self.allocator,
                 "engine_{d}_status",
                 .{i},
             );
-            defer allocator.free(sensor_name);
+            defer self.allocator.free(sensor_name);
 
             try self.addDataPoint( .{
                 .timestamp = current_time,

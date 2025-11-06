@@ -115,9 +115,11 @@ pub const FlightPlan = struct {
         self.planned_speed = aircraft_type.cruiseSpeed();
 
         // Create waypoints
+        var departure_name: [8]u8 = [_]u8{0} ** 8;
+        @memcpy(departure_name[0..4], &departure.icao_code);
         try self.waypoints.append(self.allocator, .{
             .position = departure.location,
-            .name = departure.icao_code,
+            .name = departure_name,
             .waypoint_type = .departure,
             .altitude = 0,
             .speed = 250, // 250 km/h takeoff speed
@@ -154,9 +156,11 @@ pub const FlightPlan = struct {
         });
 
         // Arrival waypoint
+        var arrival_name: [8]u8 = [_]u8{0} ** 8;
+        @memcpy(arrival_name[0..4], &arrival.icao_code);
         try self.waypoints.append(self.allocator, .{
             .position = arrival.location,
-            .name = arrival.icao_code,
+            .name = arrival_name,
             .waypoint_type = .arrival,
             .altitude = 0,
             .speed = 250,
