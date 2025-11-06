@@ -3,6 +3,8 @@ const types = @import("types.zig");
 const entities = @import("entities.zig");
 const economics = @import("economics.zig");
 const simulation = @import("simulation.zig");
+const scenario = @import("scenario.zig");
+const optimization = @import("optimization.zig");
 
 // ============================================================================
 // BUSINESS ANALYTICS AND KPIs
@@ -352,4 +354,245 @@ pub const Forecasting = struct {
             .confidence_level = 75.0, // Medium confidence
         };
     }
+};
+
+/// Advanced Analytics Engine - Evaluates all possible scenarios and outcomes
+pub const AdvancedAnalytics = struct {
+    allocator: std.mem.Allocator,
+    monte_carlo: scenario.MonteCarloSimulation,
+    what_if: scenario.WhatIfAnalysis,
+    fleet_optimizer: optimization.FleetOptimizer,
+    resource_allocator: optimization.ResourceAllocator,
+
+    pub fn init(allocator: std.mem.Allocator, seed: u64) AdvancedAnalytics {
+        return .{
+            .allocator = allocator,
+            .monte_carlo = scenario.MonteCarloSimulation.init(allocator, 1000, seed),
+            .what_if = scenario.WhatIfAnalysis.init(allocator),
+            .fleet_optimizer = optimization.FleetOptimizer.init(allocator),
+            .resource_allocator = optimization.ResourceAllocator.init(allocator),
+        };
+    }
+
+    /// Run comprehensive scenario analysis covering all possibilities
+    pub fn runComprehensiveAnalysis(
+        self: *AdvancedAnalytics,
+        world: *simulation.SimulationWorld,
+    ) !ComprehensiveAnalysisReport {
+        var report = ComprehensiveAnalysisReport{
+            .scenarios = std.ArrayList(scenario.ScenarioOutcome).init(self.allocator),
+            .optimizations = std.ArrayList(OptimizationResult).init(self.allocator),
+            .recommendations = std.ArrayList(StrategicRecommendation).init(self.allocator),
+        };
+
+        // 1. Analyze pricing scenarios (-20% to +20%)
+        const price_changes = [_]f64{ -20, -10, -5, 0, 5, 10, 15, 20 };
+        for (price_changes) |change| {
+            const outcome = try self.what_if.analyzePricingChange(world, change);
+            try report.scenarios.append(outcome);
+        }
+
+        // 2. Analyze fleet expansion scenarios
+        const aircraft_types = [_]types.AircraftType{
+            .medium_cargo,
+            .large_cargo,
+            .heavy_cargo,
+        };
+
+        const fleet_scenarios = try self.monte_carlo.simulateFleetExpansion(
+            &aircraft_types,
+            types.Money.init(100_000_000), // $100M budget
+            365, // 1 year horizon
+        );
+        defer fleet_scenarios.deinit();
+
+        for (fleet_scenarios.items) |fleet_scenario| {
+            try report.scenarios.append(fleet_scenario);
+        }
+
+        // 3. Route optimization
+        if (world.airports.items.len >= 2) {
+            for (world.airports.items[0..@min(3, world.airports.items.len)]) |origin| {
+                for (world.airports.items[0..@min(3, world.airports.items.len)]) |destination| {
+                    if (origin.id == destination.id) continue;
+
+                    const route_outcome = try self.what_if.analyzeNewRoute(
+                        origin,
+                        destination,
+                        .medium_cargo,
+                        3, // 3x per week
+                    );
+                    try report.scenarios.append(route_outcome);
+                }
+            }
+        }
+
+        // 4. Fleet mix optimization
+        if (world.cargo.items.len > 0) {
+            var total_demand: f32 = 0;
+            for (world.cargo.items) |c| total_demand += c.weight_kg / 1000.0; // to tons
+
+            const daily_demand = @max(10.0, total_demand / 30.0); // Estimate daily
+
+            const fleet_mix = try self.fleet_optimizer.optimizeFleetMix(
+                types.Money.init(50_000_000),
+                daily_demand,
+                &[_]f32{ 1000, 2000, 3000 }, // Sample distances
+            );
+            defer fleet_mix.deinit();
+
+            try report.optimizations.append(.{
+                .type = .fleet_composition,
+                .description = try std.fmt.allocPrint(
+                    self.allocator,
+                    "Optimal Fleet: {d} aircraft, {d:.1} tons capacity",
+                    .{ fleet_mix.total_aircraft, fleet_mix.total_capacity },
+                ),
+                .expected_benefit = types.Money.init(5_000_000), // Estimated
+                .implementation_cost = fleet_mix.total_cost,
+                .payback_period_days = 365,
+            });
+        }
+
+        // 5. Dynamic pricing optimization
+        const pricing_opt = optimization.PricingOptimizer.optimizePrice(
+            1000.0, // base demand
+            100.0, // base price
+            60.0, // cost per unit
+            -0.8, // elasticity
+        );
+
+        try report.optimizations.append(.{
+            .type = .pricing_strategy,
+            .description = try std.fmt.allocPrint(
+                self.allocator,
+                "Optimal Price: ${d:.2} (margin: {d:.1}%)",
+                .{ pricing_opt.price, pricing_opt.margin_percent },
+            ),
+            .expected_benefit = types.Money.init(pricing_opt.expected_profit),
+            .implementation_cost = types.Money.init(0),
+            .payback_period_days = 0,
+        });
+
+        // 6. Generate strategic recommendations
+        try report.recommendations.append(try self.generateTopRecommendation(report.scenarios.items));
+
+        // 7. Sort scenarios by expected value
+        scenario.ScenarioComparator.rankByExpectedValue(report.scenarios.items);
+
+        return report;
+    }
+
+    fn generateTopRecommendation(
+        self: *AdvancedAnalytics,
+        scenarios: []scenario.ScenarioOutcome,
+    ) !StrategicRecommendation {
+        if (scenarios.len == 0) {
+            return StrategicRecommendation{
+                .priority = .medium,
+                .category = .strategic,
+                .title = "Insufficient Data",
+                .description = "Not enough data to generate recommendations",
+                .expected_impact = types.Money.init(0),
+                .confidence = 0.5,
+            };
+        }
+
+        // Find best scenario
+        var best = scenarios[0];
+        for (scenarios) |s| {
+            if (s.calculateExpectedValue().toDollars() > best.calculateExpectedValue().toDollars()) {
+                best = s;
+            }
+        }
+
+        return StrategicRecommendation{
+            .priority = if (best.risk_level == .low and best.roi > 20) .high else .medium,
+            .category = .strategic,
+            .title = try self.allocator.dupe(u8, best.description),
+            .description = try std.fmt.allocPrint(
+                self.allocator,
+                "Expected Value: ${d:.2} | ROI: {d:.1}% | Risk: {s}",
+                .{ best.calculateExpectedValue().toDollars(), best.roi, @tagName(best.risk_level) },
+            ),
+            .expected_impact = best.projected_profit,
+            .confidence = best.probability,
+        };
+    }
+
+    pub const ComprehensiveAnalysisReport = struct {
+        scenarios: std.ArrayList(scenario.ScenarioOutcome),
+        optimizations: std.ArrayList(OptimizationResult),
+        recommendations: std.ArrayList(StrategicRecommendation),
+
+        pub fn deinit(self: *ComprehensiveAnalysisReport) void {
+            self.scenarios.deinit();
+            self.optimizations.deinit();
+            self.recommendations.deinit();
+        }
+
+        pub fn printSummary(self: ComprehensiveAnalysisReport) void {
+            std.debug.print("\n=== COMPREHENSIVE ANALYSIS REPORT ===\n\n", .{});
+            std.debug.print("Total Scenarios Evaluated: {d}\n", .{self.scenarios.items.len});
+            std.debug.print("Optimization Opportunities: {d}\n", .{self.optimizations.items.len});
+            std.debug.print("Strategic Recommendations: {d}\n\n", .{self.recommendations.items.len});
+
+            if (self.scenarios.items.len > 0) {
+                std.debug.print("Top 3 Scenarios:\n", .{});
+                for (self.scenarios.items[0..@min(3, self.scenarios.items.len)], 0..) |s, i| {
+                    std.debug.print("  {d}. {s}\n", .{ i + 1, s.description });
+                    std.debug.print("     Expected Value: ${d:.2}\n", .{s.calculateExpectedValue().toDollars()});
+                    std.debug.print("     ROI: {d:.1}% | Risk: {s}\n\n", .{ s.roi, @tagName(s.risk_level) });
+                }
+            }
+
+            if (self.recommendations.items.len > 0) {
+                std.debug.print("Top Recommendation:\n", .{});
+                const rec = self.recommendations.items[0];
+                std.debug.print("  [{s}] {s}\n", .{ @tagName(rec.priority), rec.title });
+                std.debug.print("  {s}\n", .{rec.description});
+                std.debug.print("  Expected Impact: ${d:.2}\n", .{rec.expected_impact.toDollars()});
+                std.debug.print("  Confidence: {d:.1}%\n", .{rec.confidence * 100.0});
+            }
+        }
+    };
+
+    pub const OptimizationResult = struct {
+        type: OptimizationType,
+        description: []const u8,
+        expected_benefit: types.Money,
+        implementation_cost: types.Money,
+        payback_period_days: u32,
+
+        pub const OptimizationType = enum {
+            fleet_composition,
+            route_network,
+            pricing_strategy,
+            resource_allocation,
+            schedule_optimization,
+        };
+    };
+
+    pub const StrategicRecommendation = struct {
+        priority: Priority,
+        category: Category,
+        title: []const u8,
+        description: []const u8,
+        expected_impact: types.Money,
+        confidence: f64, // 0-1
+
+        pub const Priority = enum {
+            low,
+            medium,
+            high,
+            critical,
+        };
+
+        pub const Category = enum {
+            financial,
+            operational,
+            strategic,
+            risk_mitigation,
+        };
+    };
 };

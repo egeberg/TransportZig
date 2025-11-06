@@ -51,12 +51,30 @@ A professional aviation cargo transport simulation with 3D visualization, IoT in
   - Camera controls (rotate, zoom, navigate)
   - HUD overlay with statistics
 
-### Business Analytics
+### Business Analytics & Advanced Scenario Analysis
 - **KPI Dashboard**: 20+ key performance indicators
 - **Decision Support**: AI-powered recommendations based on performance
 - **Route Profitability**: Analysis of individual route performance
 - **Forecasting**: Revenue and cost projections
 - **Market Analysis**: Economic condition tracking and impact
+- **Monte Carlo Simulation**: Probabilistic outcome evaluation (1000+ iterations)
+- **What-If Analysis**: Test business decisions before implementation
+  - Pricing strategy changes
+  - New route additions
+  - Fleet expansion scenarios
+  - Market condition impacts
+- **Risk Assessment**: Comprehensive risk evaluation with confidence intervals
+- **Optimization Algorithms**:
+  - Fleet mix optimization (maximize capacity/cost ratio)
+  - Route network optimization
+  - Dynamic pricing optimization (demand elasticity modeling)
+  - Resource allocation (Hungarian algorithm)
+  - Schedule optimization (slot cost minimization)
+- **Multi-Objective Optimization**: Balance profit, risk, utilization, satisfaction
+- **Scenario Ranking**: Automatic ranking by expected value, ROI, risk-adjusted returns
+- **Sensitivity Analysis**: Test parameter changes and impacts
+- **Decision Trees**: Multi-stage decision optimization
+- **Linear Programming**: Resource allocation optimization
 
 ## Architecture
 
@@ -74,7 +92,9 @@ src/
 ├── weather.zig       - Real-world weather data integration
 ├── notam.zig         - NOTAM fetching, parsing, and decoding
 ├── renderer.zig      - 3D visualization with raylib (optional)
-└── analytics.zig     - Business intelligence and KPIs
+├── analytics.zig     - Business intelligence and KPIs
+├── scenario.zig      - Advanced scenario analysis and Monte Carlo
+└── optimization.zig  - Optimization algorithms and resource allocation
 ```
 
 ### Data Flow
@@ -285,5 +305,12 @@ This is a business simulation application for educational and demonstration purp
 ✅ Weather alerts and operational impact
 ✅ NOTAM operational impact assessment
 ✅ Cross-platform native GUI (Linux/Windows/macOS)
+✅ **Advanced scenario analysis with Monte Carlo simulation**
+✅ **What-if analysis for all business decisions**
+✅ **Multi-objective optimization algorithms**
+✅ **Risk assessment and probability weighting**
+✅ **Fleet, route, and pricing optimization**
+✅ **Comprehensive evaluation of all possible outcomes**
 
-Ready for testing and deployment as an IoT-enabled business solution with professional UI!
+Ready for testing and deployment as an IoT-enabled business solution with
+professional UI and advanced predictive analytics!
