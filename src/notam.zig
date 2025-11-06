@@ -521,8 +521,8 @@ pub const NotamService = struct {
         };
 
         // Allocate buffer for response
-        var response_buffer = std.ArrayList(u8).init(self.allocator);
-        defer response_buffer.deinit();
+        var response_buffer = std.ArrayList(u8){};
+        defer response_buffer.deinit(self.allocator);
 
         // Make HTTP request using fetch API
         const fetch_result = self.http_client.fetch(.{

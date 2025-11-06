@@ -259,8 +259,8 @@ pub const WeatherService = struct {
         const uri = try std.Uri.parse(url);
 
         // Allocate buffer for response
-        var response_buffer = std.ArrayList(u8).init(self.allocator);
-        defer response_buffer.deinit();
+        var response_buffer = std.ArrayList(u8){};
+        defer response_buffer.deinit(self.allocator);
 
         // Make HTTP request using fetch API
         const fetch_result = try self.http_client.fetch(.{

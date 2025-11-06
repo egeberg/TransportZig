@@ -425,7 +425,8 @@ pub const IoTDataAggregator = struct {
 /// Real-time data export for external systems
 pub const DataExporter = struct {
     pub fn exportToJSON(allocator: std.mem.Allocator, telemetry: AircraftTelemetryStream) ![]u8 {
-        var buffer = std.ArrayList(u8).init(allocator);
+        var buffer = std.ArrayList(u8){};
+        defer buffer.deinit(allocator);
         var writer = buffer.writer();
 
         try writer.writeAll("{");
@@ -455,7 +456,8 @@ pub const DataExporter = struct {
     }
 
     pub fn exportToCSV(allocator: std.mem.Allocator, telemetry: AircraftTelemetryStream) ![]u8 {
-        var buffer = std.ArrayList(u8).init(allocator);
+        var buffer = std.ArrayList(u8){};
+        defer buffer.deinit(allocator);
         var writer = buffer.writer();
 
         // Header

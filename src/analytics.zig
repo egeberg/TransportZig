@@ -347,7 +347,7 @@ pub const RouteAnalyzer = struct {
         }
 
         // Convert to list and sort by profit
-        var routes = std.ArrayList(RoutePerformance).init(allocator);
+        var routes = std.ArrayList(RoutePerformance){};
         var iter = route_map.valueIterator();
         while (iter.next()) |route| {
             var r = route.*;
@@ -371,7 +371,7 @@ pub const RouteAnalyzer = struct {
 
         // Return top N routes
         if (routes.items.len > top_n) {
-            const result = std.ArrayList(RoutePerformance).init(allocator);
+            var result = std.ArrayList(RoutePerformance){};
             var i: usize = 0;
             while (i < top_n and i < routes.items.len) : (i += 1) {
                 try result.append(allocator, routes.items[i]);
