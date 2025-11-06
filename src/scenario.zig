@@ -89,7 +89,7 @@ pub const MonteCarloSimulation = struct {
         base_plan: flight.FlightPlan,
         market_conditions: []const types.MarketCondition,
     ) !MonteCarloResult {
-        var outcomes = std.ArrayList(f64).init(self.allocator);
+        var outcomes = std.ArrayList(f64){};
         defer outcomes.deinit();
 
         var i: u32 = 0;
@@ -110,7 +110,7 @@ pub const MonteCarloSimulation = struct {
             }
 
             const profit = revenue.subtract(costs).toDollars();
-            try outcomes.append(profit);
+            try outcomes.append(self.allocator, profit);
         }
 
         return try MonteCarloResult.calculate(outcomes.items);
@@ -123,7 +123,7 @@ pub const MonteCarloSimulation = struct {
         investment_budget: types.Money,
         time_horizon_days: u32,
     ) !std.ArrayList(ScenarioOutcome) {
-        var scenarios = std.ArrayList(ScenarioOutcome).init(self.allocator);
+        var scenarios = std.ArrayList(ScenarioOutcome){};
 
         for (aircraft_types) |aircraft_type| {
             const purchase_cost = aircraft_type.purchaseCost();
@@ -172,7 +172,7 @@ pub const MonteCarloSimulation = struct {
                 .payback_period_days = if (avg_profit > 0) @intFromFloat((purchase_cost.toDollars() / (avg_profit / @as(f64, @floatFromInt(time_horizon_days))))) else 9999,
             };
 
-            try scenarios.append(scenario);
+            try scenarios.append(self.allocator, scenario);
         }
 
         return scenarios;
@@ -215,7 +215,7 @@ pub const MonteCarloResult = struct {
         }
 
         // Sort for percentiles
-        var sorted = try std.heap.page_allocator.alloc(f64, values.len);
+        const sorted = try std.heap.page_allocator.alloc(f64, values.len);
         defer std.heap.page_allocator.free(sorted);
         @memcpy(sorted, values);
         std.mem.sort(f64, sorted, {}, comptime std.sort.asc(f64));
@@ -252,9 +252,6 @@ pub const WhatIfAnalysis = struct {
         world: *simulation.SimulationWorld,
         price_change_percent: f64,
     ) !ScenarioOutcome {
-        _ = self;
-        _ = world;
-
         // Estimate demand elasticity response
         const elasticity = -0.8; // -0.8% demand change per 1% price change
         const demand_change = elasticity * price_change_percent;
@@ -368,10 +365,10 @@ pub const ScenarioComparator = struct {
     }
 
     pub fn filterViable(scenarios: []const ScenarioOutcome, allocator: std.mem.Allocator) ![]ScenarioOutcome {
-        var viable = std.ArrayList(ScenarioOutcome).init(allocator);
+        var viable = std.ArrayList(ScenarioOutcome){};
         for (scenarios) |scenario| {
             if (scenario.isViable()) {
-                try viable.append(scenario);
+                try viable.append(allocator, scenario);
             }
         }
         return viable.toOwnedSlice();
@@ -410,13 +407,13 @@ pub const SensitivityAnalysis = struct {
         fuel_percent_of_costs: f64,
         price_changes: []const f64,
     ) !std.ArrayList(SensitivityResult) {
-        var results = std.ArrayList(SensitivityResult).init(std.heap.page_allocator);
+        var results = std.ArrayList(SensitivityResult){};
 
         for (price_changes) |change| {
             const fuel_cost_change = base_costs.toDollars() * (fuel_percent_of_costs / 100.0) * (change / 100.0);
             const new_total_costs = base_costs.toDollars() + fuel_cost_change;
 
-            try results.append(.{
+            try results.append(std.heap.page_allocator, .{
                 .parameter = "Fuel Price",
                 .change_percent = change,
                 .resulting_value = new_total_costs,
@@ -440,7 +437,7 @@ pub fn generateScenarioReport(
     allocator: std.mem.Allocator,
     scenarios: []const ScenarioOutcome,
 ) ![]u8 {
-    var report = std.ArrayList(u8).init(allocator);
+    var report = std.ArrayList(u8){};
     var writer = report.writer();
 
     try writer.print("\n=== COMPREHENSIVE SCENARIO ANALYSIS ===\n\n", .{});

@@ -43,7 +43,6 @@ pub const FleetOptimizer = struct {
         route_distances: []const f32,
     ) !FleetMixSolution {
         var best_solution = FleetMixSolution.init(self.allocator);
-        var best_score: f64 = -std.math.inf(f64);
 
         // Try different combinations
         const aircraft_types = [_]types.AircraftType{
@@ -169,10 +168,10 @@ pub const ResourceAllocator = struct {
         aircraft: []const entities.Aircraft,
         routes: []const RouteRequest,
     ) !std.ArrayList(Assignment) {
-        var assignments = std.ArrayList(Assignment).init(self.allocator);
+        var assignments = std.ArrayList(Assignment){};
 
         // Create cost matrix
-        var cost_matrix = try self.allocator.alloc([]f64, aircraft.len);
+        const cost_matrix = try self.allocator.alloc([]f64, aircraft.len);
         defer {
             for (cost_matrix) |row| self.allocator.free(row);
             self.allocator.free(cost_matrix);
@@ -209,7 +208,7 @@ pub const ResourceAllocator = struct {
                 }
             }
 
-            try assignments.append(.{
+            try assignments.append(self.allocator, .{
                 .aircraft_id = aircraft[best_aircraft_idx].id,
                 .route_id = routes[best_route_idx].id,
                 .cost = best_cost,
@@ -273,7 +272,7 @@ pub const ScheduleOptimizer = struct {
         flights: []FlightRequest,
         time_window_hours: u32,
     ) !std.ArrayList(OptimalSchedule) {
-        var schedules = std.ArrayList(OptimalSchedule).init(std.heap.page_allocator);
+        var schedules = std.ArrayList(OptimalSchedule){};
 
         // Sort by priority (profit potential)
         std.mem.sort(FlightRequest, flights, {}, struct {
@@ -296,7 +295,7 @@ pub const ScheduleOptimizer = struct {
             else
                 1.0; // Normal
 
-            try schedules.append(.{
+            try schedules.append(std.heap.page_allocator, .{
                 .flight_id = flight_req.id,
                 .departure_hour = optimal_hour,
                 .slot_cost_multiplier = slot_multiplier,

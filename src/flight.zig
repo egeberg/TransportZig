@@ -67,7 +67,7 @@ pub const FlightPlan = struct {
             .aircraft_id = aircraft_id,
             .departure_airport = 0,
             .arrival_airport = 0,
-            .waypoints = std.ArrayList(Waypoint).init(allocator),
+            .waypoints = std.ArrayList(Waypoint){},
             .total_distance_km = 0,
             .planned_altitude = 10000, // 10km default cruise altitude
             .planned_speed = 800,
@@ -75,10 +75,10 @@ pub const FlightPlan = struct {
             .estimated_departure = types.SimTime{ .seconds = 0 },
             .estimated_arrival = types.SimTime{ .seconds = 0 },
             .scheduled_arrival = types.SimTime{ .seconds = 0 },
-            .cargo_manifest = std.ArrayList(u32).init(allocator),
+            .cargo_manifest = std.ArrayList(u32){},
             .total_cargo_weight = 0,
             .total_cargo_volume = 0,
-            .assigned_crew = std.ArrayList(u32).init(allocator),
+            .assigned_crew = std.ArrayList(u32){},
             .status = .scheduled,
             .weather_forecast = .clear,
             .estimated_cost = types.Money.init(0),
@@ -113,7 +113,7 @@ pub const FlightPlan = struct {
         self.planned_speed = aircraft_type.cruiseSpeed();
 
         // Create waypoints
-        try self.waypoints.append(.{
+        try self.waypoints.append(allocator, .{
             .position = departure.location,
             .name = departure.icao_code,
             .waypoint_type = .departure,
@@ -123,7 +123,7 @@ pub const FlightPlan = struct {
 
         // Climb waypoint (20% of route)
         const climb_factor = 0.2;
-        try self.waypoints.append(.{
+        try self.waypoints.append(allocator, .{
             .position = self.interpolatePosition(departure.location, arrival.location, climb_factor),
             .name = [_]u8{ 'C', 'L', 'I', 'M', 'B', 0, 0, 0 },
             .waypoint_type = .climb,
@@ -133,7 +133,7 @@ pub const FlightPlan = struct {
 
         // Cruise waypoint (60% of route)
         const cruise_factor = 0.6;
-        try self.waypoints.append(.{
+        try self.waypoints.append(allocator, .{
             .position = self.interpolatePosition(departure.location, arrival.location, cruise_factor),
             .name = [_]u8{ 'C', 'R', 'U', 'I', 'S', 'E', 0, 0 },
             .waypoint_type = .cruise,
@@ -143,7 +143,7 @@ pub const FlightPlan = struct {
 
         // Descent waypoint (90% of route)
         const descent_factor = 0.9;
-        try self.waypoints.append(.{
+        try self.waypoints.append(allocator, .{
             .position = self.interpolatePosition(departure.location, arrival.location, descent_factor),
             .name = [_]u8{ 'D', 'E', 'S', 'C', 'N', 'D', 0, 0 },
             .waypoint_type = .descent,
@@ -152,7 +152,7 @@ pub const FlightPlan = struct {
         });
 
         // Arrival waypoint
-        try self.waypoints.append(.{
+        try self.waypoints.append(allocator, .{
             .position = arrival.location,
             .name = arrival.icao_code,
             .waypoint_type = .arrival,
@@ -175,10 +175,10 @@ pub const FlightPlan = struct {
         };
     }
 
-    pub fn addCargo(self: *FlightPlan, cargo_id: u32, weight_tons: f32, volume_m3: f32) !bool {
+    pub fn addCargo(self: *FlightPlan, allocator: std.mem.Allocator, cargo_id: u32, weight_tons: f32, volume_m3: f32) !bool {
         self.total_cargo_weight += weight_tons;
         self.total_cargo_volume += volume_m3;
-        try self.cargo_manifest.append(cargo_id);
+        try self.cargo_manifest.append(allocator, cargo_id);
         return true;
     }
 
@@ -190,7 +190,6 @@ pub const FlightPlan = struct {
         fuel_pricing: economics.FuelPricing,
         crew: []const economics.CrewEconomics.CrewMember,
     ) void {
-        const flight_hours = self.total_distance_km / self.planned_speed;
         const weather_multiplier = self.weather_forecast.fuelConsumptionMultiplier();
 
         const costs = economics.FlightEconomics.calculateTotalFlightCost(
@@ -282,7 +281,7 @@ pub const ActiveFlight = struct {
         };
     }
 
-    pub fn update(self: *ActiveFlight, current_time: types.SimTime, delta_seconds: f32) void {
+    pub fn update(self: *ActiveFlight, current_time: types.SimTime, _: f32) void {
         const elapsed = current_time.elapsedHours(self.actual_departure_time);
         const total_flight_hours = self.flight_plan.total_distance_km / self.flight_plan.planned_speed;
 
@@ -351,9 +350,9 @@ pub const FlightScheduler = struct {
     pub fn init(allocator: std.mem.Allocator) FlightScheduler {
         return .{
             .allocator = allocator,
-            .scheduled_flights = std.ArrayList(FlightPlan).init(allocator),
-            .active_flights = std.ArrayList(ActiveFlight).init(allocator),
-            .completed_flights = std.ArrayList(FlightPlan).init(allocator),
+            .scheduled_flights = std.ArrayList(FlightPlan){},
+            .active_flights = std.ArrayList(ActiveFlight){},
+            .completed_flights = std.ArrayList(FlightPlan){},
         };
     }
 
@@ -373,14 +372,14 @@ pub const FlightScheduler = struct {
     }
 
     pub fn addFlight(self: *FlightScheduler, flight: FlightPlan) !void {
-        try self.scheduled_flights.append(flight);
+        try self.scheduled_flights.append(self.allocator, flight);
     }
 
     pub fn launchFlight(self: *FlightScheduler, flight_id: u32, current_time: types.SimTime) !bool {
         for (self.scheduled_flights.items, 0..) |flight, i| {
             if (flight.id == flight_id) {
                 const active = ActiveFlight.init(flight, current_time);
-                try self.active_flights.append(active);
+                try self.active_flights.append(self.allocator, active);
                 _ = self.scheduled_flights.orderedRemove(i);
                 return true;
             }
@@ -395,7 +394,7 @@ pub const FlightScheduler = struct {
             flight.update(current_time, delta_seconds);
 
             if (flight.isComplete()) {
-                try self.completed_flights.append(flight.flight_plan);
+                try self.completed_flights.append(self.allocator, flight.flight_plan);
                 _ = self.active_flights.orderedRemove(i);
             } else {
                 i += 1;

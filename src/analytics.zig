@@ -188,12 +188,12 @@ pub const DecisionSupport = struct {
     };
 
     pub fn analyzeAndRecommend(allocator: std.mem.Allocator, world: *simulation.SimulationWorld) !std.ArrayList(Recommendation) {
-        var recommendations = std.ArrayList(Recommendation).init(allocator);
+        var recommendations = std.ArrayList(Recommendation){};
         const kpis = KPIs.calculate(world);
 
         // Financial recommendations
         if (kpis.profit_margin_percent < 10.0) {
-            try recommendations.append(.{
+            try recommendations.append(allocator, .{
                 .priority = .high,
                 .category = .financial,
                 .message = "Low profit margin - Consider optimizing routes or increasing cargo rates",
@@ -203,7 +203,7 @@ pub const DecisionSupport = struct {
 
         // Fleet utilization
         if (kpis.fleet_utilization_percent < 60.0) {
-            try recommendations.append(.{
+            try recommendations.append(allocator, .{
                 .priority = .medium,
                 .category = .operational,
                 .message = "Low fleet utilization - Schedule more flights or reduce fleet size",
@@ -213,7 +213,7 @@ pub const DecisionSupport = struct {
 
         // Load factor
         if (kpis.average_load_factor_percent < 70.0) {
-            try recommendations.append(.{
+            try recommendations.append(allocator, .{
                 .priority = .medium,
                 .category = .operational,
                 .message = "Low cargo load factor - Improve cargo acquisition or use smaller aircraft",
@@ -224,7 +224,7 @@ pub const DecisionSupport = struct {
         // Market conditions
         switch (world.market_condition) {
             .boom, .growth => {
-                try recommendations.append(.{
+                try recommendations.append(allocator, .{
                     .priority = .high,
                     .category = .strategic,
                     .message = "Favorable market conditions - Consider expanding fleet",
@@ -232,7 +232,7 @@ pub const DecisionSupport = struct {
                 });
             },
             .recession => {
-                try recommendations.append(.{
+                try recommendations.append(allocator, .{
                     .priority = .critical,
                     .category = .risk,
                     .message = "Market recession - Focus on cost reduction and efficiency",
@@ -244,7 +244,7 @@ pub const DecisionSupport = struct {
 
         // Profitability check
         if (kpis.gross_profit.isNegative()) {
-            try recommendations.append(.{
+            try recommendations.append(allocator, .{
                 .priority = .critical,
                 .category = .financial,
                 .message = "CRITICAL: Operating at a loss - Immediate action required",
@@ -309,15 +309,12 @@ pub const RouteAnalyzer = struct {
     }
 
     pub fn findMostProfitableRoutes(
-        allocator: std.mem.Allocator,
-        world: *simulation.SimulationWorld,
-        top_n: usize,
+        _: std.mem.Allocator,
+        _: *simulation.SimulationWorld,
+        _: usize,
     ) !std.ArrayList(RoutePerformance) {
-        _ = allocator;
-        _ = world;
-        _ = top_n;
         // Placeholder for route ranking algorithm
-        return std.ArrayList(RoutePerformance).init(allocator);
+        return std.ArrayList(RoutePerformance){};
     }
 };
 
@@ -380,16 +377,16 @@ pub const AdvancedAnalytics = struct {
         world: *simulation.SimulationWorld,
     ) !ComprehensiveAnalysisReport {
         var report = ComprehensiveAnalysisReport{
-            .scenarios = std.ArrayList(scenario.ScenarioOutcome).init(self.allocator),
-            .optimizations = std.ArrayList(OptimizationResult).init(self.allocator),
-            .recommendations = std.ArrayList(StrategicRecommendation).init(self.allocator),
+            .scenarios = std.ArrayList(scenario.ScenarioOutcome){},
+            .optimizations = std.ArrayList(OptimizationResult){},
+            .recommendations = std.ArrayList(StrategicRecommendation){},
         };
 
         // 1. Analyze pricing scenarios (-20% to +20%)
         const price_changes = [_]f64{ -20, -10, -5, 0, 5, 10, 15, 20 };
         for (price_changes) |change| {
             const outcome = try self.what_if.analyzePricingChange(world, change);
-            try report.scenarios.append(outcome);
+            try report.scenarios.append(self.allocator, outcome);
         }
 
         // 2. Analyze fleet expansion scenarios
@@ -407,7 +404,7 @@ pub const AdvancedAnalytics = struct {
         defer fleet_scenarios.deinit();
 
         for (fleet_scenarios.items) |fleet_scenario| {
-            try report.scenarios.append(fleet_scenario);
+            try report.scenarios.append(self.allocator, fleet_scenario);
         }
 
         // 3. Route optimization
@@ -422,7 +419,7 @@ pub const AdvancedAnalytics = struct {
                         .medium_cargo,
                         3, // 3x per week
                     );
-                    try report.scenarios.append(route_outcome);
+                    try report.scenarios.append(self.allocator, route_outcome);
                 }
             }
         }
@@ -441,7 +438,7 @@ pub const AdvancedAnalytics = struct {
             );
             defer fleet_mix.deinit();
 
-            try report.optimizations.append(.{
+            try report.optimizations.append(self.allocator, .{
                 .type = .fleet_composition,
                 .description = try std.fmt.allocPrint(
                     self.allocator,
@@ -462,7 +459,7 @@ pub const AdvancedAnalytics = struct {
             -0.8, // elasticity
         );
 
-        try report.optimizations.append(.{
+        try report.optimizations.append(self.allocator, .{
             .type = .pricing_strategy,
             .description = try std.fmt.allocPrint(
                 self.allocator,
@@ -475,7 +472,7 @@ pub const AdvancedAnalytics = struct {
         });
 
         // 6. Generate strategic recommendations
-        try report.recommendations.append(try self.generateTopRecommendation(report.scenarios.items));
+        try report.recommendations.append(self.allocator, try self.generateTopRecommendation(report.scenarios.items));
 
         // 7. Sort scenarios by expected value
         scenario.ScenarioComparator.rankByExpectedValue(report.scenarios.items);

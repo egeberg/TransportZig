@@ -268,7 +268,7 @@ pub const WeatherService = struct {
         try req.wait();
 
         // Read response
-        var response_data = std.ArrayList(u8).init(self.allocator);
+        var response_data = std.ArrayList(u8){};
         defer response_data.deinit();
 
         const body = req.reader();

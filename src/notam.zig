@@ -236,14 +236,13 @@ pub const NotamParser = struct {
         // Parse coordinates from Q line if present
         var latitude: ?f32 = null;
         var longitude: ?f32 = null;
-        var radius_nm: ?f32 = null;
+        const radius_nm: ?f32 = null;
 
         if (q_line) |q| {
             // Q line format includes coordinates: .../XXXXNYYYYYYW999
             // Try to extract coordinates
             if (std.mem.indexOf(u8, q, "N")) |n_pos| {
-                if (std.mem.indexOf(u8, q[n_pos..], "W")) |w_offset| {
-                    const w_pos = n_pos + w_offset;
+                if (std.mem.indexOf(u8, q[n_pos..], "W")) |_| {
                     // Parse lat/lon (simplified)
                     latitude = 40.0; // Placeholder
                     longitude = -73.0; // Placeholder
@@ -342,7 +341,7 @@ pub const NotamParser = struct {
             return try self.allocator.dupe(u8, trimmed);
         }
 
-        if (q_line) |q| {
+        if (q_line) |_| {
             return try self.allocator.dupe(u8, "See Q line for details");
         }
 
@@ -478,7 +477,7 @@ pub const NotamService = struct {
         _ = latitude;
         _ = longitude;
 
-        var notams = std.ArrayList(Notam).init(self.allocator);
+        var notams = std.ArrayList(Notam){};
 
         // Build URL for FAA NOTAM search
         const icao_str = std.mem.sliceTo(&icao_code, 0);
@@ -513,7 +512,7 @@ pub const NotamService = struct {
         timestamp: u64,
     ) !AirportNotams {
         const icao_str = std.mem.sliceTo(&icao_code, 0);
-        var notams = std.ArrayList(Notam).init(self.allocator);
+        var notams = std.ArrayList(Notam){};
 
         // Generate 1-3 simulated NOTAMs per airport
         const notam_count = 1 + (@mod(airport_id, 3));
@@ -545,7 +544,7 @@ pub const NotamService = struct {
                 .{ "XXXX", icao_str, start_time, end_time, condition }
             );
 
-            try notams.append(Notam{
+            try notams.append(self.allocator, Notam{
                 .id = id,
                 .location = try self.allocator.dupe(u8, icao_str),
                 .category = category,
@@ -637,10 +636,10 @@ pub const NotamService = struct {
             const now = @as(u64, @intCast(std.time.timestamp()));
 
             // Filter active NOTAMs
-            var active = std.ArrayList(Notam).init(self.allocator);
+            var active = std.ArrayList(Notam){};
             for (airport_notams.notams.items) |notam| {
                 if (notam.isActive(now)) {
-                    active.append(notam) catch continue;
+                    active.append(self.allocator, notam) catch continue;
                 }
             }
 

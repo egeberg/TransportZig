@@ -57,11 +57,11 @@ pub const SimulationWorld = struct {
             .current_time = types.SimTime{ .seconds = 0 },
             .time_scale = 60.0, // Default: 1 minute per second
             .total_runtime_seconds = 0,
-            .airports = std.ArrayList(entities.Airport).init(allocator),
-            .aircraft = std.ArrayList(entities.Aircraft).init(allocator),
-            .cargo = std.ArrayList(entities.Cargo).init(allocator),
-            .companies = std.ArrayList(entities.Company).init(allocator),
-            .crew_members = std.ArrayList(economics.CrewEconomics.CrewMember).init(allocator),
+            .airports = std.ArrayList(entities.Airport){},
+            .aircraft = std.ArrayList(entities.Aircraft){},
+            .cargo = std.ArrayList(entities.Cargo){},
+            .companies = std.ArrayList(entities.Company){},
+            .crew_members = std.ArrayList(economics.CrewEconomics.CrewMember){},
             .flight_scheduler = flight.FlightScheduler.init(allocator),
             .fuel_pricing = economics.FuelPricing.init(),
             .market_condition = .normal,
@@ -254,7 +254,7 @@ pub const SimulationWorld = struct {
         self.next_airport_id += 1;
 
         const airport = entities.Airport.init(id, icao, iata, name, location, airport_class);
-        try self.airports.append(airport);
+        try self.airports.append(self.allocator, airport);
 
         return id;
     }
@@ -269,12 +269,12 @@ pub const SimulationWorld = struct {
         self.next_aircraft_id += 1;
 
         const aircraft = entities.Aircraft.init(id, registration, aircraft_type, owner_company_id, self.current_time);
-        try self.aircraft.append(aircraft);
+        try self.aircraft.append(self.allocator, aircraft);
 
         // Add to company fleet
         for (self.companies.items) |*company| {
             if (company.id == owner_company_id) {
-                try company.owned_aircraft.append(id);
+                try company.owned_aircraft.append(company.allocator, id);
                 company.addCost(aircraft_type.purchaseCost());
                 break;
             }
@@ -305,7 +305,7 @@ pub const SimulationWorld = struct {
             shipper_id,
             self.current_time,
         );
-        try self.cargo.append(cargo);
+        try self.cargo.append(self.allocator, cargo);
 
         self.stats.total_cargo_created += 1;
         self.stats.total_cargo_weight_kg += weight_kg;
@@ -318,7 +318,7 @@ pub const SimulationWorld = struct {
         self.next_company_id += 1;
 
         const company = try entities.Company.init(self.allocator, id, name, starting_capital);
-        try self.companies.append(company);
+        try self.companies.append(self.allocator, company);
 
         return id;
     }
@@ -341,7 +341,7 @@ pub const SimulationWorld = struct {
             .flight_hours = 0,
             .rest_required_until = self.current_time,
         };
-        try self.crew_members.append(crew);
+        try self.crew_members.append(self.allocator, crew);
 
         return id;
     }
