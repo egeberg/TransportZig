@@ -520,35 +520,45 @@ pub const NotamService = struct {
             return std.ArrayList(Notam){};
         };
 
-        // Buffer for response body
-        var response_buffer = std.ArrayList(u8){};
-        defer response_buffer.deinit(self.allocator);
+        // Create HTTP request (Zig 0.15.1 API)
+        var headers = std.http.Headers{ .allocator = self.allocator };
+        defer headers.deinit();
 
-        // Create writer and access Io.Writer interface (Zig 0.15.1 I/O interface)
-        var writer = response_buffer.writer(self.allocator);
+        var request = self.http_client.request(.GET, uri, headers, .{}) catch |err| {
+            std.debug.print("Failed to create NOTAM request: {}\n", .{err});
+            return std.ArrayList(Notam){};
+        };
+        defer request.deinit();
 
-        // Make HTTP request using fetch (Zig 0.15.1 API)
-        const result = self.http_client.fetch(.{
-            .location = .{ .uri = uri },
-            .method = .GET,
-            .response_writer = &writer.interface,
-        }) catch |err| {
-            std.debug.print("NOTAM API request failed: {}\n", .{err});
+        // Start request and wait for response
+        request.start() catch |err| {
+            std.debug.print("NOTAM API request start failed: {}\n", .{err});
+            return std.ArrayList(Notam){};
+        };
+        request.wait() catch |err| {
+            std.debug.print("NOTAM API request wait failed: {}\n", .{err});
             return std.ArrayList(Notam){};
         };
 
         // Check status
-        if (result.status != .ok) {
-            std.debug.print("NOTAM API returned status: {}\n", .{result.status});
+        if (request.response.status != .ok) {
+            std.debug.print("NOTAM API returned status: {}\n", .{request.response.status});
             return std.ArrayList(Notam){};
         }
+
+        // Read response body
+        const body = request.reader().readAllAlloc(self.allocator, 16 * 1024 * 1024) catch |err| {
+            std.debug.print("NOTAM API response read failed: {}\n", .{err});
+            return std.ArrayList(Notam){};
+        };
+        defer self.allocator.free(body);
 
         // Parse response - FAA API typically returns JSON or text format
         // Try to parse as newline-delimited NOTAM text
         var notams = std.ArrayList(Notam){};
         var parser = NotamParser.init(self.allocator);
 
-        var line_iter = std.mem.splitScalar(u8, response_buffer.items, '\n');
+        var line_iter = std.mem.splitScalar(u8, body, '\n');
         while (line_iter.next()) |line| {
             if (line.len == 0) continue;
 
