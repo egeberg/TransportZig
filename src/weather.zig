@@ -258,20 +258,24 @@ pub const WeatherService = struct {
         // Parse URI
         const uri = try std.Uri.parse(url);
 
+        // Buffer for response body
+        var response_buffer = std.ArrayList(u8){};
+        defer response_buffer.deinit(self.allocator);
+
         // Make HTTP request using fetch (Zig 0.15.1 API)
         const result = try self.http_client.fetch(.{
             .location = .{ .uri = uri },
             .method = .GET,
+            .response_writer = response_buffer.writer(),
         });
-        defer self.allocator.free(result.body);
 
         // Check status
         if (result.status != .ok) {
             return error.WeatherAPIBadStatus;
         }
 
-        // Parse JSON response from body
-        return try WeatherData.fromOpenWeatherMapJSON(self.allocator, result.body);
+        // Parse JSON response from buffer
+        return try WeatherData.fromOpenWeatherMapJSON(self.allocator, response_buffer.items);
     }
 
     /// Update weather for all airports
