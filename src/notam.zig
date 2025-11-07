@@ -524,11 +524,15 @@ pub const NotamService = struct {
         var response_buffer = std.ArrayList(u8){};
         defer response_buffer.deinit(self.allocator);
 
+        // Create writer and wrap it in Io.Writer (Zig 0.15.1 I/O interface)
+        var writer = response_buffer.writer(self.allocator);
+        var io_writer = std.Io.Writer.init(&writer);
+
         // Make HTTP request using fetch (Zig 0.15.1 API)
         const result = self.http_client.fetch(.{
             .location = .{ .uri = uri },
             .method = .GET,
-            .response_writer = response_buffer.writer(self.allocator),
+            .response_writer = &io_writer,
         }) catch |err| {
             std.debug.print("NOTAM API request failed: {}\n", .{err});
             return std.ArrayList(Notam){};
