@@ -527,9 +527,13 @@ pub const NotamService = struct {
         };
         defer request.deinit();
 
-        // Start request and wait for response
-        request.start() catch |err| {
-            std.debug.print("NOTAM API request start failed: {}\n", .{err});
+        // Send request and wait for response
+        request.send() catch |err| {
+            std.debug.print("NOTAM API request send failed: {}\n", .{err});
+            return std.ArrayList(Notam){};
+        };
+        request.finish() catch |err| {
+            std.debug.print("NOTAM API request finish failed: {}\n", .{err});
             return std.ArrayList(Notam){};
         };
         request.wait() catch |err| {

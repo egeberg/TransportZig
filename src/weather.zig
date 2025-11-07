@@ -262,8 +262,9 @@ pub const WeatherService = struct {
         var request = try self.http_client.request(.GET, uri, .{});
         defer request.deinit();
 
-        // Start request and wait for response
-        try request.start();
+        // Send request and wait for response
+        try request.send();
+        try request.finish();
         try request.wait();
 
         // Check status
