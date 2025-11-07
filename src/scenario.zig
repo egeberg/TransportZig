@@ -36,6 +36,7 @@ pub const ScenarioOutcome = struct {
     // Comparative metrics
     npv: types.Money, // Net Present Value
     roi: f64, // Return on Investment %
+    cost_benefit_ratio: f64, // Benefits / Costs (>1.0 is favorable)
     payback_period_days: u32,
 
     pub const RiskLevel = enum {
@@ -65,6 +66,16 @@ pub const ScenarioOutcome = struct {
         if (self_risk_adj > other_risk_adj) return .gt;
         if (self_risk_adj < other_risk_adj) return .lt;
         return .eq;
+    }
+
+    pub fn calculateCostBenefitRatio(self: ScenarioOutcome) f64 {
+        const costs = self.projected_costs.toDollars();
+        if (costs == 0.0) return 0.0;
+        return self.projected_revenue.toDollars() / costs;
+    }
+
+    pub fn isCostEffective(self: ScenarioOutcome) bool {
+        return self.cost_benefit_ratio >= 1.0;
     }
 };
 
@@ -169,6 +180,7 @@ pub const MonteCarloSimulation = struct {
                 .volatility = 0.15 + self.random.float(f32) * 0.2,
                 .npv = types.Money.init(avg_profit * 0.9), // Simplified NPV
                 .roi = (avg_profit / purchase_cost.toDollars()) * 100.0,
+                .cost_benefit_ratio = (total_profit + purchase_cost.toDollars()) / purchase_cost.toDollars(),
                 .payback_period_days = if (avg_profit > 0) @intFromFloat((purchase_cost.toDollars() / (avg_profit / @as(f64, @floatFromInt(time_horizon_days))))) else 9999,
             };
 
@@ -279,6 +291,7 @@ pub const WhatIfAnalysis = struct {
             .volatility = 0.2,
             .npv = new_profit.multiply(0.9),
             .roi = (new_profit.toDollars() / current_kpis.total_costs.toDollars()) * 100.0,
+            .cost_benefit_ratio = new_revenue.toDollars() / current_kpis.total_costs.toDollars(),
             .payback_period_days = 180,
         };
     }
@@ -333,6 +346,7 @@ pub const WhatIfAnalysis = struct {
             .volatility = 0.25,
             .npv = types.Money.init(annual_profit * 3.5), // 3.5 year projection
             .roi = (annual_profit / annual_costs) * 100.0,
+            .cost_benefit_ratio = annual_revenue / annual_costs,
             .payback_period_days = 365,
         };
     }
@@ -360,6 +374,14 @@ pub const ScenarioComparator = struct {
         std.mem.sort(ScenarioOutcome, scenarios, {}, struct {
             fn lessThan(_: void, a: ScenarioOutcome, b: ScenarioOutcome) bool {
                 return a.roi > b.roi;
+            }
+        }.lessThan);
+    }
+
+    pub fn rankByCostBenefitRatio(scenarios: []ScenarioOutcome) void {
+        std.mem.sort(ScenarioOutcome, scenarios, {}, struct {
+            fn lessThan(_: void, a: ScenarioOutcome, b: ScenarioOutcome) bool {
+                return a.cost_benefit_ratio > b.cost_benefit_ratio;
             }
         }.lessThan);
     }
@@ -449,6 +471,7 @@ pub fn generateScenarioReport(
         try writer.print("  Expected Profit: ${d:.2}\n", .{scenario.projected_profit.toDollars()});
         try writer.print("  Expected Value: ${d:.2}\n", .{scenario.calculateExpectedValue().toDollars()});
         try writer.print("  ROI: {d:.1}%\n", .{scenario.roi});
+        try writer.print("  Cost-Benefit Ratio: {d:.2} ({s})\n", .{ scenario.cost_benefit_ratio, if (scenario.isCostEffective()) "Favorable" else "Unfavorable" });
         try writer.print("  Risk Level: {s}\n", .{@tagName(scenario.risk_level)});
         try writer.print("  Payback Period: {d} days\n\n", .{scenario.payback_period_days});
     }
