@@ -521,10 +521,7 @@ pub const NotamService = struct {
         };
 
         // Create HTTP request (Zig 0.15.1 API)
-        var headers = std.http.Headers{ .allocator = self.allocator };
-        defer headers.deinit();
-
-        var request = self.http_client.request(.GET, uri, headers, .{}) catch |err| {
+        var request = self.http_client.request(.GET, uri, .{}) catch |err| {
             std.debug.print("Failed to create NOTAM request: {}\n", .{err});
             return std.ArrayList(Notam){};
         };

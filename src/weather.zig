@@ -259,10 +259,7 @@ pub const WeatherService = struct {
         const uri = try std.Uri.parse(url);
 
         // Create HTTP request (Zig 0.15.1 API)
-        var headers = std.http.Headers{ .allocator = self.allocator };
-        defer headers.deinit();
-
-        var request = try self.http_client.request(.GET, uri, headers, .{});
+        var request = try self.http_client.request(.GET, uri, .{});
         defer request.deinit();
 
         // Start request and wait for response
