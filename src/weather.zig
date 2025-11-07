@@ -266,7 +266,7 @@ pub const WeatherService = struct {
         const result = try self.http_client.fetch(.{
             .location = .{ .uri = uri },
             .method = .GET,
-            .response_writer = response_buffer.writer(),
+            .response_writer = response_buffer.writer(self.allocator),
         });
 
         // Check status

@@ -528,7 +528,7 @@ pub const NotamService = struct {
         const result = self.http_client.fetch(.{
             .location = .{ .uri = uri },
             .method = .GET,
-            .response_writer = response_buffer.writer(),
+            .response_writer = response_buffer.writer(self.allocator),
         }) catch |err| {
             std.debug.print("NOTAM API request failed: {}\n", .{err});
             return std.ArrayList(Notam){};
