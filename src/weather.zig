@@ -258,12 +258,18 @@ pub const WeatherService = struct {
         // Parse URI
         const uri = try std.Uri.parse(url);
 
+        // Buffer for HTTP headers (required by Zig 0.15.1 API)
+        var server_header_buffer: [2048]u8 = undefined;
+
         // Create HTTP request using open() API (Zig 0.15.1)
-        var request = try self.http_client.open(.GET, uri, .{});
+        var request = try self.http_client.open(.GET, uri, .{
+            .server_header_buffer = &server_header_buffer,
+        });
         defer request.deinit();
 
         // Send request and wait for response
         try request.send();
+        try request.finish();
         try request.wait();
 
         // Check status

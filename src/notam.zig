@@ -520,8 +520,13 @@ pub const NotamService = struct {
             return std.ArrayList(Notam){};
         };
 
+        // Buffer for HTTP headers (required by Zig 0.15.1 API)
+        var server_header_buffer: [2048]u8 = undefined;
+
         // Create HTTP request using open() API (Zig 0.15.1)
-        var request = self.http_client.open(.GET, uri, .{}) catch |err| {
+        var request = self.http_client.open(.GET, uri, .{
+            .server_header_buffer = &server_header_buffer,
+        }) catch |err| {
             std.debug.print("Failed to create NOTAM request: {}\n", .{err});
             return std.ArrayList(Notam){};
         };
@@ -530,6 +535,10 @@ pub const NotamService = struct {
         // Send request and wait for response
         request.send() catch |err| {
             std.debug.print("NOTAM API request send failed: {}\n", .{err});
+            return std.ArrayList(Notam){};
+        };
+        request.finish() catch |err| {
+            std.debug.print("NOTAM API request finish failed: {}\n", .{err});
             return std.ArrayList(Notam){};
         };
         request.wait() catch |err| {
